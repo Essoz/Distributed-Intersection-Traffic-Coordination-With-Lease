@@ -1,0 +1,14 @@
+metadata:
+  name: car1
+  id: 1
+  type: sedan
+spec:
+  location: [0, 0]
+  speed: 0
+  heading: 0
+  acceleration: 0
+  destination: [0, 0]
+  passingBlocks: 
+    - name: block1
+      position: [0, 0] # relative to intersection
+      size: [1, 1]

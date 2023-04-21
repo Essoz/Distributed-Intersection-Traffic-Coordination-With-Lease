@@ -1,0 +1,72 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "metadata": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": ["name", "type"]
+      },
+      "spec": {
+        "type": "object",
+        "description": "These are dynamic properties that are updated by the simulator",
+        "properties": {
+          "location": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "speed": {
+            "type": "number"
+          },
+          "heading": {
+            "type": "number"
+          },
+          "acceleration": {
+            "type": "number"
+          },
+          "destination": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "passingBlocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "position": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "size": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                }
+              },
+              "required": ["name", "position", "size"]
+            }
+          }
+        },
+        "required": ["location", "speed", "heading", "acceleration", "destination", "passingBlocks"]
+      }
+    },
+    "required": ["metadata"]
+  }
+  

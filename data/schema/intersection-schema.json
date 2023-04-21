@@ -1,0 +1,68 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "metadata": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "name of the intersection, this name can be used to retrieve the intersection from the database"
+                }
+            },
+            "required": ["name"]
+        },
+        "spec": {
+            "type": "object",
+            "properties": {
+                "size": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "description": "size of the intersection in centimeters",
+                    "minItems": 2,
+                    "maxItems": 2
+                },
+                "position": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "description": "position of the intersection in centimeters",
+                    "minItems": 2,
+                    "maxItems": 2
+                },
+                "splitIndex": {
+                    "type": "number",
+                    "description": "the intersection will be equally split into 2^splitIndex blocks"
+                },
+                "blocks": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "name of the block, this name can be used to retrieve the block from the database"
+                            },
+                            "position": {
+                                "type": "array",
+                                "items": {"type": "number"},
+                                "description": "position of the block in centimeters",
+                                "minItems": 2,
+                                "maxItems": 2
+                            },
+                            "size": {
+                                "type": "array",
+                                "items": {"type": "number"},
+                                "description": "size of the block in centimeters",
+                                "minItems": 2,
+                                "maxItems": 2
+                            }
+                        },
+                        "required": ["name", "position", "size"]
+                    }
+                }
+            },
+            "required": ["size", "position", "splitIndex", "blocks"]
+        }
+    },
+    "required": ["metadata", "spec"]
+}

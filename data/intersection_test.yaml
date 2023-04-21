@@ -1,0 +1,10 @@
+metadata:
+  name: test
+spec:
+  position: [0, 0] # relative to world (0 is at the start of the road)
+  size: [1, 1]
+  splitIndex: 1
+  blocks:
+    - name: block1
+      position: [0, 0] # relative to intersection
+      size: [1, 1]
