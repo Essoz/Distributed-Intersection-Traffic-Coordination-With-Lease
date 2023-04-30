@@ -1,0 +1,60 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "metadata": {
+            "type": "object",
+            "properties": {
+                "name": {
+                "type": "string"
+                }
+            },
+            "required": ["name"]
+        },
+        "spec": {
+            "type": "object",
+            "properties": {
+                "size": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                },
+                "location": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                },
+                "leases": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                        "carName": {
+                            "type": "string"
+                        },
+                        "blockName": {
+                            "type": "string"
+                        },
+                        "startTime": {
+                            "type": "integer"
+                        },
+                        "endTime": {
+                            "type": "integer"
+                        }
+                        },
+                        "required": ["carName", "blockName", "startTime", "endTime"]
+                    }
+                }
+            },
+            "required": ["size", "location", "leases"]
+        }
+    },
+    "required": ["metadata", "spec"]
+}
+  

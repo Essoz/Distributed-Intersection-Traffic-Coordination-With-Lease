@@ -70,10 +70,7 @@ func initializeIntersectionAndBlock(cli *clientv3.Client, ctx context.Context, p
 }
 
 func run(cli *clientv3.Client, ctx context.Context) {
-	// TODO: motion control
-	// TODO: vehicle localization
-	// TODO: interface with the vehicle and map reconstruction
-	// TODO: lease management
+	var carSelf car.Car
 
 	// put a key
 	_, err := cli.Put(context.Background(), "abc", "bar")
@@ -95,6 +92,11 @@ func run(cli *clientv3.Client, ctx context.Context) {
 
 		// TODO: get the current time, position, speed, acceleration, direction of the car itself
 		// TODO: get_info(car_id, time, position, speed, acceleration, direction)
+		carSelf = car.GetCarEtcd(cli, ctx, CAR_PREFIX+global_car_name)
+		if carSelf.GetDynamics() == nil {
+			log.Println("car spec is nil")
+			continue
+		}
 
 		// TODO: get the current time, position, speed, acceleration, direction of the surrounding cars
 		// TODO: get_info_surroundings(car_id, time, position, speed, acceleration, direction)

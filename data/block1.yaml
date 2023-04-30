@@ -1,0 +1,10 @@
+metadata:
+  name: block1
+spec:
+  size: [1, 1]
+  location: [0, 1]
+  leases:
+    - carName: car1
+      blockName: block1
+      startTime: 15
+      endTime: 123

@@ -9,10 +9,6 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-const BLOCK_PREFIX = "block_"
-const INTERSECTION_PREFIX = "intersection_"
-const CAR_PREFIX = "car_"
-
 var global_car_name string
 
 func main() {

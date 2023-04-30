@@ -10,14 +10,25 @@
           },
           "type": {
             "type": "string"
+          },
+          "isV2v": {
+            "type": "boolean"
           }
         },
-        "required": ["name", "type"]
+        "required": ["name", "type", "isV2v"]
       },
-      "spec": {
+      "dynamics": {
         "type": "object",
         "description": "These are dynamic properties that are updated by the simulator",
         "properties": {
+          "stage": {
+            "type": "string",
+            "enum": [
+              "planning",
+              "crossing",
+              "crossed"
+            ]
+          },
           "location": {
             "type": "array",
             "items": {
@@ -64,9 +75,9 @@
             }
           }
         },
-        "required": ["location", "speed", "heading", "acceleration", "destination", "passingBlocks"]
+        "required": ["stage", "location", "speed", "heading", "acceleration", "destination", "passingBlocks"]
       }
     },
-    "required": ["metadata"]
+    "required": ["metadata", "dynamics"]
   }
   

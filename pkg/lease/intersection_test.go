@@ -16,13 +16,6 @@ func TestMarshalIntersection(t *testing.T) {
 			Name: "test",
 		},
 		Spec: lease.IntersectionSpec{
-			Blocks: []lease.IntersectionSpecBlocksElem{
-				{
-					Name:     "block1",
-					Position: []float64{0, 0},
-					Size:     []float64{1, 1},
-				},
-			},
 			Position:   []float64{0, 0},
 			Size:       []float64{1, 1},
 			SplitIndex: 1,

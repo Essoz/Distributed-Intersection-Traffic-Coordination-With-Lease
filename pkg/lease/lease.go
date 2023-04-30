@@ -1,9 +1,9 @@
 package lease
 
-func NewLease(carId int, blockId int, startTime int, endTime int) *Lease {
+func NewLease(carName string, blockName string, startTime int, endTime int) *Lease {
 	return &Lease{
-		CarId:     carId,
-		BlockId:   blockId,
+		CarName:   carName,
+		BlockName: blockName,
 		StartTime: startTime,
 		EndTime:   endTime,
 	}
@@ -27,4 +27,12 @@ func (lease *Lease) GetStartTime() int {
 
 func (lease *Lease) GetEndTime() int {
 	return lease.EndTime
+}
+
+func (lease *Lease) GetCarName() string {
+	return lease.CarName
+}
+
+func (lease *Lease) GetBlockName() string {
+	return lease.BlockName
 }

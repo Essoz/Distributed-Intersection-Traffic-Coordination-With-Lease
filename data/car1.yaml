@@ -2,7 +2,9 @@ metadata:
   name: car1
   id: 1
   type: sedan
-spec:
+  isV2v: true
+dynamics:
+  stage: planning
   location: [0, 0]
   speed: 0
   heading: 0

@@ -4,23 +4,25 @@ import (
 	"errors"
 )
 
-func NewBlock(id int) Block {
-	return Block{
-		Id:     id,
-		Leases: []Lease{},
-	}
+// get block name
+func (b *Block) GetName() string {
+	return b.Metadata.Name
 }
 
-func (block *Block) CleanPastLeases(currentTime int) {
-	for i, lease := range block.Leases {
+func (b *Block) GetLeases() []Lease {
+	return b.Spec.Leases
+}
+
+func (b *Block) CleanPastLeases(currentTime int) {
+	for i, lease := range b.GetLeases() {
 		if lease.EndTime < currentTime {
-			block.Leases = append(block.Leases[:i], block.Leases[i+1:]...)
+			b.Spec.Leases = append(b.GetLeases()[:i], b.GetLeases()[i+1:]...)
 		}
 	}
 }
 
-func (block *Block) GetCurrentLease(currentTime int) Lease {
-	for _, lease := range block.Leases {
+func (b *Block) GetCurrentLease(currentTime int) Lease {
+	for _, lease := range b.GetLeases() {
 		if lease.StartTime <= currentTime && lease.EndTime >= currentTime {
 			return lease
 		}
@@ -29,19 +31,19 @@ func (block *Block) GetCurrentLease(currentTime int) Lease {
 	return Lease{}
 }
 
-func (block *Block) addNewLease(lease Lease) {
-	block.Leases = append(block.Leases, lease)
+func (b *Block) addNewLease(lease Lease) {
+	b.Spec.Leases = append(b.GetLeases(), lease)
 }
 
-func (block *Block) ApplyNewLease(lease Lease, currentTime int) error {
+func (b *Block) ApplyNewLease(lease Lease, currentTime int) error {
 	// If there is a current lease, then we need to end it
-	currentLease := block.GetCurrentLease(currentTime)
+	currentLease := b.GetCurrentLease(currentTime)
 	if currentLease != (Lease{}) {
 		// TODO: if the applied lease cannot fit, add constraint solving logic. For now, just return failure
 		return errors.New("cannot apply new lease as it overlaps with the current lease")
 	}
 
 	// Add the new lease
-	block.addNewLease(lease)
+	b.addNewLease(lease)
 	return nil
 }

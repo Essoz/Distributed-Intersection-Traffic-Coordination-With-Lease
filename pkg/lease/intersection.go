@@ -44,3 +44,17 @@ func (i *Intersection) IsVehicleGoingToPassIntersection(speed float64, location 
 
 	return true
 }
+
+func (i *Intersection) IsVehicleInsideIntersection(location []float64) bool {
+	locationX := location[0]
+	locationY := location[1]
+
+	if locationX >= i.Spec.Position[0] &&
+		locationY <= i.Spec.Position[1] &&
+		locationX <= i.Spec.Position[0]+i.Spec.Size[0] &&
+		locationY <= i.Spec.Position[1]+i.Spec.Size[1] {
+		return true
+	}
+
+	return false
+}

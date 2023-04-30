@@ -3,6 +3,7 @@ module github.com/essoz/car-backend
 go 1.20
 
 require (
+	github.com/google/go-cmp v0.5.9
 	go.etcd.io/etcd/client/v3 v3.5.8
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -12,7 +13,6 @@ require (
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/go-cmp v0.5.9 // indirect
 	go.etcd.io/etcd/api/v3 v3.5.8 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.8 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
