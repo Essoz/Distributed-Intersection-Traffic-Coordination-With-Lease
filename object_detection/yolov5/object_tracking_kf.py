@@ -117,6 +117,10 @@ myCam2 = Camera2D(camera_id="1", frame_width=imageWidth, frame_height=imageHeigh
 myCam3 = Camera2D(camera_id="2", frame_width=imageWidth, frame_height=imageHeight, frame_rate=frameRate)
 myCam4 = Camera2D(camera_id="3", frame_width=imageWidth, frame_height=imageHeight, frame_rate=frameRate)
 
+# position
+pos = [0, 1.4, 1.8, 3.2]
+start_tuples = [(pos[0], pos[2]), (pos[1], pos[3]), (pos[2], pos[3]), (pos[3], pos[2]), (pos[3], pos[1]), (pos[2], pos[0]), (pos[1], pos[0]), (pos[0], pos[1])]
+
 
 # Qcar LIDAR module
 # -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
@@ -304,7 +308,8 @@ def get_self_speed():
 
 
 def get_self_dist():
-    return current_dist
+    dist_tuple = (start_tuples[start_pos][0] + current_dist * np.cos(heading), start_tuples[start_pos][1] + current_dist * np.sin(heading))
+    return dist_tuple
 
 
 
@@ -544,6 +549,8 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         hide_conf=False,  # hide confidences
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
+        start_pos=0,
+        heading=0
         ):
     global mutex_img, mutex_map, img_transform, map, cars_dict
     sampleRate = 10.0
@@ -752,7 +759,9 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                 # match cars
                 match_cars(cars_position, start)
                 # match_cars([kf_position], start)
-                print(cars_dict)
+                print("cars_dict:", cars_dict)
+                print("speed:", get_self_speed())
+                print("position:", get_self_dist())
 
 
             # sleepTime = sampleTime - (computationTime % sampleTime)
@@ -893,6 +902,8 @@ def parse_opt():
     parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
     parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
+    parser.add_argument('--start_pos', type = int, default=0, help='from left upper heading right (x), clockwise 0-7 (0 is adjacent to 15)')
+    parser.add_argument('--heading', type = float, default=0, help='0 for x, 90 for y, 180 for -x, 270 for -y')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(FILE.stem, opt)
@@ -900,14 +911,13 @@ def parse_opt():
 
 
 def main(opt):
+    global start_pos, heading
+    start_pos = opt.start_pos
+    heading = opt.heading
     check_requirements(exclude=('tensorboard', 'thop'))
     run(**vars(opt))
 
-
-if __name__ == "__main__":
-    opt = parse_opt()
-    main(opt)
-
+def run_http_serve():
     port = 11001
     import flask
     from flask import Flask
@@ -916,6 +926,15 @@ if __name__ == "__main__":
     @app.route('/perception/getSurrounding', methods=['GET'])
     def getSurrounding():
         return flask.jsonify({'data': get_cars_dict()})
-
     # run the server
     app.run(port=port, host='localhost', debug=True, use_reloader=False)
+
+
+if __name__ == "__main__":
+    opt = parse_opt()
+
+    http_thread = threading.Thread(target=run_http_serve)
+    http_thread.start()
+    
+    main(opt)
+
