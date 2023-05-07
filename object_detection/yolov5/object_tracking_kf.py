@@ -36,8 +36,11 @@ import threading
 
 # import Qcar packages
 from Quanser.q_essential import Camera2D, LIDAR
-from Quanser.q_misc import Utilities
-from Quanser.q_interpretation import *
+from Quanser.product_QCar import QCar
+from Quanser.q_ui import gamepadViaTarget
+from Quanser.q_misc import Calculus
+from Quanser.q_interpretation import lidar_frame_2_body_frame, basic_speed_estimation
+from Quanser.q_control import speed_control
 import time
 
 
@@ -95,7 +98,7 @@ def elapsed_time():
 simulationTime = 60.0
 frameRate = 30.0
 thread_terminate = False
-# print('Sample Time: ', sampleTime)
+print('Simulation Time: ', simulationTime)
 
 
 # Qcar 360-camera module
@@ -108,7 +111,6 @@ horizontalBlank     = np.zeros((20, 2*imageWidth+20, 3), dtype=np.uint8)
 verticalBlank       = np.zeros((imageHeight, 20, 3), dtype=np.uint8)
 # imageBuffer360 = np.zeros((2*imageHeight + 20, 2*imageWidth + 20, 3), dtype=np.uint8) # 20 px padding between pieces
 
-# -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 ## Initialize the CSI cameras
 myCam1 = Camera2D(camera_id="0", frame_width=imageWidth, frame_height=imageHeight, frame_rate=frameRate)
 myCam2 = Camera2D(camera_id="1", frame_width=imageWidth, frame_height=imageHeight, frame_rate=frameRate)
@@ -133,6 +135,22 @@ mutex_img = threading.Lock()
 
 # LIDAR initialization and measurement buffers
 myLidar = LIDAR(num_measurements=720)
+
+
+# Qcar Drive module
+# -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+MANUAL_DRIVE = True
+SPEED = 0.5
+diff = Calculus().differentiator_variable(1/50.0)
+next(diff)
+current_speed = 0
+current_dist = 0
+## QCar and Gamepad Initialization
+myCar = QCar()
+if MANUAL_DRIVE:
+    gpad = gamepadViaTarget(1)
+
+
 
 # KF
 if kalman_on == 1:
@@ -269,6 +287,15 @@ def process_pred(pred, map):
 num_cars = 0
 cars_dict = {}
 def get_cars_dict():
+    """
+    Schema of cars_dict:
+    {
+        "location": position of cars at given time
+        "speed": velocity calculated by diff of "pos"
+        "time": time detecting these data
+    }
+    """
+
     return cars_dict
     
 
@@ -279,20 +306,20 @@ def match_cars(cars_position, timeDetect):
             appended = False
             cars_dict_keys = list(cars_dict.keys())
             for car_2 in cars_dict_keys:
-                possible_pos = (cars_dict[car_2]["velocity"][0]*(timeDetect - cars_dict[car_2]["time"]) + cars_dict[car_2]["pos"][0], cars_dict[car_2]["velocity"][1]*(timeDetect - cars_dict[car_2]["time"]) + cars_dict[car_2]["pos"][1])
+                possible_pos = (cars_dict[car_2]["speed"][0]*(timeDetect - cars_dict[car_2]["time"]) + cars_dict[car_2]["location"][0], cars_dict[car_2]["speed"][1]*(timeDetect - cars_dict[car_2]["time"]) + cars_dict[car_2]["location"][1])
                 if (possible_pos[0]-car_1[0])**2 + (possible_pos[1]-car_1[1])**2 < 0.2**2:
-                    cars_dict[car_2]["velocity"] = (0.6 * (car_1[0]-cars_dict[car_2]["pos"][0]) / (timeDetect - cars_dict[car_2]["time"]) + 0.4 * cars_dict[car_2]["velocity"][0], 0.6 * (car_1[1]-cars_dict[car_2]["pos"][1]) / (timeDetect - cars_dict[car_2]["time"]) + 0.4 * cars_dict[car_2]["velocity"][1])
-                    cars_dict[car_2]["pos"] = car_1
+                    cars_dict[car_2]["speed"] = (0.6 * (car_1[0]-cars_dict[car_2]["location"][0]) / (timeDetect - cars_dict[car_2]["time"]) + 0.4 * cars_dict[car_2]["speed"][0], 0.6 * (car_1[1]-cars_dict[car_2]["location"][1]) / (timeDetect - cars_dict[car_2]["time"]) + 0.4 * cars_dict[car_2]["speed"][1])
+                    cars_dict[car_2]["location"] = car_1
                     cars_dict[car_2]["time"] = timeDetect
                     appended = True
                     break
                 elif timeDetect - cars_dict[car_2]["time"] > 0.5:
                     del(cars_dict[car_2])
             if not appended:
-                cars_dict[num_cars] = {"velocity": (0, 0), "pos": car_1, "time": timeDetect}
+                cars_dict[num_cars] = {"speed": (0, 0), "location": car_1, "time": timeDetect}
                 num_cars += 1
         else:
-            cars_dict[num_cars] = {"velocity": (0, 0), "pos": car_1, "time": timeDetect}
+            cars_dict[num_cars] = {"speed": (0, 0), "location": car_1, "time": timeDetect}
             num_cars += 1
 
 
@@ -414,6 +441,74 @@ def lidar_receiver(*args, **kwargs):
     return
 
 
+def car_control(speed):
+    global current_speed, current_dist, thread_terminate
+    sampleRate = 50.0
+    sampleTime = 1/sampleRate
+    lastTime = None
+    timeStep = sampleTime
+    ## Main Loop
+    try:
+        while elapsed_time() < simulationTime:
+            # Start timing this iteration
+            start = time.time()
+            if lastTime is not None:
+                timeStep = start - lastTime
+
+            _,_, encoderCounts = myCar.read_std()  
+            encoderSpeed = diff.send((encoderCounts, timeStep))
+            current_speed = basic_speed_estimation(encoderSpeed)
+            current_dist = basic_speed_estimation(encoderCounts)
+
+            if MANUAL_DRIVE:
+                # Read Gamepad states
+                new = gpad.read()
+
+                # Basic IO - write motor commands
+                if new:
+                    if gpad.LT:
+                        mtr_cmd = np.array([-0.3*gpad.LT, -0.066])
+                    else:
+                        mtr_cmd = np.array([0.3*gpad.RT, -0.066])
+            else:
+                mtr_cmd = np.array([0,-0.066]) 
+                # the parameter for straight run
+                mtr_cmd[0] = speed_control(speed,current_speed,1,timeStep)
+
+            LEDs = np.array([0, 0, 0, 0, 0, 0, 1, 1])
+            # Adjust LED indicators based on steering and reverse indicators based on reverse gear
+            if mtr_cmd[1] > 0.3:
+                LEDs[0] = 1
+                LEDs[2] = 1
+            elif mtr_cmd[1] < -0.3:
+                LEDs[1] = 1
+                LEDs[3] = 1
+            if mtr_cmd[0] < 0:
+                LEDs[5] = 1
+
+            myCar.write_mtrs(mtr_cmd)
+            myCar.write_LEDs(LEDs)
+
+            # End timing this iteration
+            end = time.time()
+
+            # Calculate computation time, and the time that the thread should pause/sleep for
+            computation_time = end - start
+            sleep_time = sampleTime - computation_time%sampleTime
+            lastTime = start
+
+            # Pause/sleep and print out the current timestamp
+            time.sleep(sleep_time)
+
+    except KeyboardInterrupt:
+        print("QCar: User interrupted!")
+
+    finally:
+        print("terminate QCar")
+        # Terminate the LIDAR object
+        myCar.terminate()
+
+
 @torch.no_grad()
 def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         # source=ROOT / 'data/images',  # file/dir/URL/glob, 0 for webcam
@@ -521,8 +616,10 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
 
     lidarThread = threading.Thread(target=lidar_receiver, args=tuple())
     cameraThread = threading.Thread(target=camera_receiver, args=(imgsz, stride, pt, onnx, device, half))
+    QcarThread = threading.Thread(target=car_control, args=(SPEED, ))
     lidarThread.start()
     cameraThread.start()
+    QcarThread.start()
 
     # Run inference
     if pt and device.type != 'cpu':
