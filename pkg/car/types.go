@@ -32,7 +32,7 @@ type CarDynamics struct {
 	PassingBlocks []CarDynamicsPassingBlocksElem `json:"passingBlocks" yaml:"passingBlocks"`
 
 	// Speed corresponds to the JSON schema field "speed".
-	Speed float64 `json:"speed" yaml:"speed"`
+	Speed []float64 `json:"speed" yaml:"speed"`
 
 	// Stage corresponds to the JSON schema field "stage".
 	Stage CarDynamicsStage `json:"stage" yaml:"stage"`
@@ -103,6 +103,18 @@ func (j *CarDynamics) UnmarshalJSON(b []byte) error {
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
+	}
+	if len(plain.Location) < 2 {
+		return fmt.Errorf("field %s length: must be >= %d", "location", 2)
+	}
+	if len(plain.Location) > 2 {
+		return fmt.Errorf("field %s length: must be <= %d", "location", 2)
+	}
+	if len(plain.Speed) < 2 {
+		return fmt.Errorf("field %s length: must be >= %d", "speed", 2)
+	}
+	if len(plain.Speed) > 2 {
+		return fmt.Errorf("field %s length: must be <= %d", "speed", 2)
 	}
 	*j = CarDynamics(plain)
 	return nil

@@ -1,10 +1,8 @@
 package lease
 
 import (
-	"math"
 	"os"
 
-	"github.com/essoz/car-backend/pkg/car"
 	yaml "gopkg.in/yaml.v3"
 )
 
@@ -24,26 +22,26 @@ func NewIntersection(path string) *Intersection {
 	return &intersection
 }
 
-func (i *Intersection) IsVehicleGoingToPassIntersection(speed float64, location float64, acceleration float64) bool {
-	var closestIntersectionBoundary float64
+// func (i *Intersection) IsVehicleGoingToPassIntersection(speed float64, location float64, acceleration float64) bool {
+// 	var closestIntersectionBoundary float64
 
-	if location < i.Spec.Position[0] {
-		closestIntersectionBoundary = i.Spec.Position[0]
-	} else if location > i.Spec.Position[1] {
-		closestIntersectionBoundary = i.Spec.Position[1]
-	} else {
-		// already in the intersection TODO: behavior to be specified
-		panic("Unimplemented")
-	}
+// 	if location < i.Spec.Position[0] {
+// 		closestIntersectionBoundary = i.Spec.Position[0]
+// 	} else if location > i.Spec.Position[1] {
+// 		closestIntersectionBoundary = i.Spec.Position[1]
+// 	} else {
+// 		// already in the intersection TODO: behavior to be specified
+// 		panic("Unimplemented")
+// 	}
 
-	timeToReach := car.TimeToReach(location, speed, closestIntersectionBoundary, acceleration)
-	// if timeToReach is inf, then the vehicle is not going to pass the intersection
-	if timeToReach == math.Inf(1) || timeToReach == math.Inf(-1) {
-		return false
-	}
+// 	timeToReach := car.TimeToReach(location, speed, closestIntersectionBoundary, acceleration)
+// 	// if timeToReach is inf, then the vehicle is not going to pass the intersection
+// 	if timeToReach == math.Inf(1) || timeToReach == math.Inf(-1) {
+// 		return false
+// 	}
 
-	return true
-}
+// 	return true
+// }
 
 func (i *Intersection) IsVehicleInsideIntersection(location []float64) bool {
 	locationX := location[0]

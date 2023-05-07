@@ -19,8 +19,12 @@ func (c *Car) TimeToEnter(destination float64) float64 {
 //
 // Output:
 //   - the time it takes to reach the destination in seconds
-func TimeToEnter(currentLocation float64, destination float64, speed float64, acceleration float64) float64 {
+func TimeToEnter(currentLocation float64, destination float64, speed []float64, acceleration float64) float64 {
+	// TODO: change datatypes to []float64 and re-implement the function
+
 	distanceToReach := destination - currentLocation
+	// ecu speed is the root square of the speed
+	ecuSpeed := math.Sqrt((speed[0]*speed[0] + speed[1]*speed[1]))
 
 	if distanceToReach == 0 {
 		// already at the destination
@@ -28,26 +32,26 @@ func TimeToEnter(currentLocation float64, destination float64, speed float64, ac
 	}
 
 	// not at the destination
-	if speed == 0 && acceleration == 0 {
+	if ecuSpeed == 0 && acceleration == 0 {
 		// no speed, no acceleration
 		return math.Inf(1)
 	}
 
 	if acceleration == 0 {
 		// no acceleration
-		return distanceToReach / speed
+		return distanceToReach / ecuSpeed
 	}
 
 	// acceleration != 0
 	// solve the quadratic equation
-	if speed*speed+2*acceleration*distanceToReach < 0 {
+	if ecuSpeed*ecuSpeed+2*acceleration*distanceToReach < 0 {
 		// no solution
 		return math.Inf(1)
 	}
 
 	// there is a solution
-	t1 := (-speed + math.Sqrt(speed*speed+2*acceleration*distanceToReach)) / acceleration
-	t2 := (-speed - math.Sqrt(speed*speed+2*acceleration*distanceToReach)) / acceleration
+	t1 := (-ecuSpeed + math.Sqrt(ecuSpeed*ecuSpeed+2*acceleration*distanceToReach)) / acceleration
+	t2 := (-ecuSpeed - math.Sqrt(ecuSpeed*ecuSpeed+2*acceleration*distanceToReach)) / acceleration
 	if t1 > 0 && t2 > 0 {
 		// both solutions are positive
 		return math.Min(t1, t2)
