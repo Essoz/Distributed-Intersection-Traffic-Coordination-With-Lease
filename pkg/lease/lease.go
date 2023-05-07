@@ -1,5 +1,9 @@
 package lease
 
+import (
+	"time"
+)
+
 func NewLease(carName string, blockName string, startTime int, endTime int) *Lease {
 	return &Lease{
 		CarName:   carName,
@@ -7,6 +11,21 @@ func NewLease(carName string, blockName string, startTime int, endTime int) *Lea
 		StartTime: startTime,
 		EndTime:   endTime,
 	}
+}
+
+func (lease *Lease) IsActive() bool {
+	currTime := int(time.Now().Unix())
+	return currTime >= lease.StartTime && currTime <= lease.EndTime
+}
+
+func (lease *Lease) IsUpcoming() bool {
+	currTime := int(time.Now().Unix())
+	return currTime < lease.StartTime
+}
+
+func (lease *Lease) IsExpired() bool {
+	currTime := int(time.Now().Unix())
+	return currTime > lease.EndTime
 }
 
 func (lease *Lease) OverlapsWith(other Lease) bool {

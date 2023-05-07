@@ -2,7 +2,12 @@ package car
 
 import "math"
 
-// TimeToReach returns the time it takes to reach a destination from a current location
+func (c *Car) TimeToEnter(destination float64) float64 {
+	// TODO: FIX LOCATION
+	return TimeToEnter(c.Dynamics.Location[0], destination, c.Dynamics.Speed, c.Dynamics.Acceleration)
+}
+
+// TimeToEnter returns the time it takes to reach a destination from a current location
 // with a given speed and acceleration
 // Estimation Method:
 // \int_{0}^{t} (v + at) dt = | destination - currentLocation |
@@ -14,7 +19,7 @@ import "math"
 //
 // Output:
 //   - the time it takes to reach the destination in seconds
-func TimeToReach(currentLocation float64, destination float64, speed float64, acceleration float64) float64 {
+func TimeToEnter(currentLocation float64, destination float64, speed float64, acceleration float64) float64 {
 	distanceToReach := destination - currentLocation
 
 	if distanceToReach == 0 {
