@@ -16,8 +16,31 @@ const (
 	PERCEPTION_SERVICE_PORT = "11001"
 )
 
-func getCarSelf(ctx context.Context) car.Car {
-	return car.Car{}
+func getCarSelfLocation(ctx context.Context) []float64 {
+	url := "http://localhost:" + PERCEPTION_SERVICE_PORT + "/perception/getSelfLocation"
+	resp, err := http.Get(url)
+	if err != nil {
+		log.Fatalf("Failed to make a request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("Failed to read the response body: %v", err)
+	}
+
+	var result map[string]interface{}
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		log.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	data, ok := result["data"].([]interface{})
+	if !ok {
+		log.Fatalf("Failed to cast data to []interface{}")
+	}
+
+	return []float64{data[0].(float64), data[1].(float64)}
 }
 
 func getCarSurrounding(ctx context.Context) []car.Car {
@@ -78,10 +101,15 @@ func getCarSurrounding(ctx context.Context) []car.Car {
 func RunPerceptionService(cli *clientv3.Client, ctx context.Context, carName string) {
 	// THIS FUNCTION WILL INTERFACE THE PERCEPTION SERVICE
 	log.Printf("Running perception service for car %s", carName)
+	currCar := car.Car{
+		Metadata: car.CarMetadata{
+			Name: carName,
+		},
+	}
 	for {
 		log.Printf("Updating car %s at %s", carName, time.Now().Format("2006-01-02 15:04:05"))
 
-		currCar := getCarSelf(ctx)
+		currCar.Dynamics.Location = getCarSelfLocation(ctx)
 		// update the car's location and speed
 		currCar.PutEtcd(cli, ctx, "")
 

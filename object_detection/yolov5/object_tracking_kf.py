@@ -1030,6 +1030,15 @@ def run_http_serve():
     @app.route('/perception/getSurrounding', methods=['GET'])
     def getSurrounding():
         return flask.jsonify({'data': get_cars_dict()})
+    
+    @app.route('/perception/getSelfLocation', methods=['GET'])
+    def getSelfLocation():
+        return flask.jsonify({'data': get_self_dist()})
+    
+    @app.route('/perception/getSelfSpeed', methods=['GET'])
+    def getSelfSpeed():
+        return flask.jsonify({'data': get_self_speed()})
+
     # run the server
     app.run(port=port, host='localhost', debug=True, use_reloader=False)
 

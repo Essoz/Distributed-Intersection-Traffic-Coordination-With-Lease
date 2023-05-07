@@ -40,6 +40,16 @@
         const [x, y] = car.dynamics.location;
         carElement.style.left = `${x}px`;
         carElement.style.top = `${y}px`;
+
+        const carLabel = document.createElement('span');
+        carLabel.textContent = car.metadata.name;
+        carLabel.style.position = 'absolute';
+        carLabel.style.left = '8px';
+        carLabel.style.top = '-2px';
+        carLabel.style.fontSize = '12px';
+        carLabel.style.whiteSpace = 'nowrap';
+
+        carElement.appendChild(carLabel);
         mapElement.appendChild(carElement);
       });
     };
