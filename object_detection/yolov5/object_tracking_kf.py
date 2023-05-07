@@ -299,6 +299,15 @@ def get_cars_dict():
     return cars_dict
     
 
+def get_self_speed():
+    return current_speed
+
+
+def get_self_dist():
+    return current_dist
+
+
+
 def match_cars(cars_position, timeDetect):
     global num_cars
     for car_1 in cars_position:
