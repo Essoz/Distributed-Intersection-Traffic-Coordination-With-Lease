@@ -143,8 +143,8 @@ myLidar = LIDAR(num_measurements=720)
 
 # Qcar Drive module
 # -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-MANUAL_DRIVE = True
-SPEED = 0.5
+MANUAL_DRIVE = False
+SPEED = 0.2
 diff = Calculus().differentiator_variable(1/50.0)
 next(diff)
 current_speed = 0
@@ -226,31 +226,31 @@ def process_pred(pred, map):
                     cars_angle.append((real_angle_l, real_angle_r, 0, None))
 
     # merge cars' image on the edge of each camera
-    # new_cars_angle = []
-    # for car_1 in cars_angle:
-    #     if car_1[3] is not None:
-    #         for car_2 in cars_angle:
-    #             if car_2[3] is not None and car_2[3] == car_1[2] and car_2[2] == car_1[3]:
-    #                 if car_1[2] < car_2[2]:
-    #                     if car_1[2] != 0 and car_2[2] != 3:
-    #                         new_cars_angle.append((car_1[0], car_2[1]))
-    #                         break
-    #                     else:
-    #                         new_cars_angle.append((car_2[0]+2*np.pi, car_1[1]))
-    #                         break
-    #                 elif car_1[2] > car_2[2]:
-    #                     if car_1[2] != 3 and car_2[2] != 0:
-    #                         new_cars_angle.append((car_2[0], car_1[1]))
-    #                         break
-    #                     else:
-    #                         new_cars_angle.append((car_1[0], car_2[1]-2*np.pi))
-    #                         break
-    #     else:
-    #         new_cars_angle.append((car_1[0], car_1[1]))
+    new_cars_angle = []
+    for car_1 in cars_angle:
+        if car_1[3] is not None:
+            for car_2 in cars_angle:
+                if car_2[3] is not None and car_2[3] == car_1[2] and car_2[2] == car_1[3]:
+                    if car_1[2] < car_2[2]:
+                        if car_1[2] != 0 or car_2[2] != 3:
+                            new_cars_angle.append((car_1[0], car_2[1]))
+                            break
+                        else:
+                            new_cars_angle.append((car_2[0]+2*np.pi, car_1[1]))
+                            break
+                    elif car_1[2] > car_2[2]:
+                        if car_1[2] != 3 or car_2[2] != 0:
+                            new_cars_angle.append((car_2[0], car_1[1]))
+                            break
+                        else:
+                            new_cars_angle.append((car_1[0], car_2[1]-2*np.pi))
+                            break
+        else:
+            new_cars_angle.append((car_1[0], car_1[1]))
 
 
-    # for car in new_cars_angle:
-    for car in cars_angle:
+    # calculate location of each other car
+    for car in new_cars_angle:
         dist_list = []
 
         for angle, dist in map:
@@ -489,6 +489,9 @@ def car_control(speed):
             encoderSpeed = diff.send((encoderCounts, timeStep))
             current_speed = basic_speed_estimation(encoderSpeed)
             current_dist = basic_speed_estimation(encoderCounts)
+
+            if current_dist > 2:
+                break
 
             if MANUAL_DRIVE:
                 # Read Gamepad states
