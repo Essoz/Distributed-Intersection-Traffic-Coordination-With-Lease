@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/essoz/car-backend/pkg/car"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -14,6 +15,10 @@ import (
 const (
 	PERCEPTION_SERVICE_PORT = "11001"
 )
+
+func getCarSelf(ctx context.Context) car.Car {
+	return car.Car{}
+}
 
 func getCarSurrounding(ctx context.Context) []car.Car {
 	// THIS FUNCTION WILL GET THE SURROUNDING OBJECTS OF THE CAR
@@ -72,15 +77,24 @@ func getCarSurrounding(ctx context.Context) []car.Car {
 
 func RunPerceptionService(cli *clientv3.Client, ctx context.Context, carName string) {
 	// THIS FUNCTION WILL INTERFACE THE PERCEPTION SERVICE
+	log.Printf("Running perception service for car %s", carName)
+	for {
+		log.Printf("Updating car %s at %s", carName, time.Now().Format("2006-01-02 15:04:05"))
 
-	for true {
-		currCar := car.GetCarEtcd(cli, ctx, carName)
+		currCar := getCarSelf(ctx)
+		// update the car's location and speed
+		currCar.PutEtcd(cli, ctx, "")
+
 		// Get all surrounding objects
 		currSurrCars := getCarSurrounding(ctx)
 		currSurrCarPtrs := make([]*car.Car, len(currSurrCars))
 		for i := range currSurrCars {
+			log.Printf("Surrounding car %s", currSurrCars[i].Metadata.Name)
 			currSurrCarPtrs[i] = &currSurrCars[i]
 		}
 		currCar.UpdateSurroundingCarsEtcd(cli, ctx, currSurrCarPtrs)
+
+		// sleep for 0.05 second
+		time.Sleep(50 * time.Millisecond)
 	}
 }

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Car Locations</title>
+  <style>
+    #map {
+      position: relative;
+      width: 800px;
+      height: 600px;
+      border: 1px solid black;
+    }
+    .car {
+      position: absolute;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background-color: red;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    const mapElement = document.getElementById('map');
+
+    const fetchData = async () => {
+      const response = await fetch('http://localhost:11002/car/getAll');
+      const data = await response.json();
+      return data;
+    };
+
+    const renderCars = (carData) => {
+      mapElement.innerHTML = '';
+
+      carData.forEach((car) => {
+        const carElement = document.createElement('div');
+        carElement.classList.add('car');
+        const [x, y] = car.dynamics.location;
+        carElement.style.left = `${x}px`;
+        carElement.style.top = `${y}px`;
+        mapElement.appendChild(carElement);
+      });
+    };
+
+    const refreshInterval = 100;
+    const updateCarLocations = async () => {
+      try {
+        const carData = await fetchData();
+        renderCars(carData);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
+
+    setInterval(updateCarLocations, refreshInterval);
+    updateCarLocations();
+  </script>
+</body>
+</html>
