@@ -28,7 +28,7 @@ func (c *Car) GetDynamics() *CarDynamics {
 // set the speed of the car to a given speed
 // Input:
 //   - speed: the speed to set the car to in centimeters per second
-func (c *Car) SetSpeed(speed float64) {
+func (c *Car) SetSpeed(speed []float64) {
 	c.Dynamics.Speed = speed
 }
 
@@ -53,6 +53,6 @@ func (c *Car) GetLocation() []float64 {
 	return c.Dynamics.Location
 }
 
-func (c *Car) GetSpeed() float64 {
+func (c *Car) GetSpeed() []float64 {
 	return c.Dynamics.Speed
 }

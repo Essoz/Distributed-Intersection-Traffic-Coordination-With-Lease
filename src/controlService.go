@@ -38,18 +38,18 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 			// get the first lease that the car will enter
 			FirstLease := leases[0]
 			if FirstLease.IsUpcoming() == false {
-				log.Errorf("Car %s is not going to enter the intersection", carName)
+				log.Errorf(ctx, "car %s is not going to enter the intersection", carName)
 				continue
 			}
 
 			// estimate the time it takes to reach the first lease
-			timeToFirstLease := currCar.TimeToEnter(intersection.Spec.Position[0]) // FIXME: Coordinate system
+			// timeToFirstLease := currCar.TimeToEnter(intersection.Spec.Position[0]) // FIXME: Coordinate system
 
 			// calculate the speed the car should be at in order to meet the leasing requirements
 
-			recommenedSpeed := 123
+			// recommenedSpeed := 123
 			// make control movements
-			currCar.UpdateSpeed(recommenedSpeed).PutEtcd(cli, ctx)
+			// currCar.UpdateSpeed(recommenedSpeed).PutEtcd(cli, ctx)
 
 		case car.CarDynamicsStageCrossing:
 			continue
@@ -62,10 +62,10 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 		// car stage update
 		if currCar.GetStage() == car.CarDynamicsStagePlanning &&
 			intersection.IsVehicleInsideIntersection(currCar.GetLocation()) {
-			currCar.UpdateStage(car.CarDynamicsStageCrossing).PutEtcd(cli, ctx)
+			currCar.UpdateStage(car.CarDynamicsStageCrossing).PutEtcd(cli, ctx, "")
 		} else if currCar.GetStage() == car.CarDynamicsStageCrossing &&
 			!intersection.IsVehicleInsideIntersection(currCar.GetLocation()) {
-			currCar.UpdateStage(car.CarDynamicsStageCrossed).PutEtcd(cli, ctx)
+			currCar.UpdateStage(car.CarDynamicsStageCrossed).PutEtcd(cli, ctx, "")
 		}
 	}
 }

@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/google/go-cmp v0.5.9
 	go.etcd.io/etcd/client/v3 v3.5.8
+	google.golang.org/appengine v1.4.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

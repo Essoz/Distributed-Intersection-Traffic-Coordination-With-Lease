@@ -13,7 +13,7 @@ var global_car_name string
 
 func main() {
 	// parse the command line arguments
-	intersectionPath := flag.String("i", "data/intersection.yaml", "path to the intersection yaml file")
+	// intersectionPath := flag.String("i", "data/intersection.yaml", "path to the intersection yaml file")
 	carPath := flag.String("c", "data/car.yaml", "path to the car yaml file")
 
 	flag.Parse()
@@ -28,7 +28,7 @@ func main() {
 	}
 	defer cli.Close()
 
-	initializeIntersectionAndBlock(cli, context.Background(), *intersectionPath)
+	// initializeIntersectionAndBlock(cli, context.Background(), *intersectionPath)
 	initializeCar(cli, context.Background(), *carPath)
 
 	// start the main loop

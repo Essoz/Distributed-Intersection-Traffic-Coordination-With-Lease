@@ -5,9 +5,7 @@ import (
 	"log"
 
 	"github.com/essoz/car-backend/pkg/car"
-	"github.com/essoz/car-backend/pkg/lease"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"gopkg.in/yaml.v3"
 )
 
 func initializeCar(cli *clientv3.Client, ctx context.Context, pathToCar string) {
@@ -16,58 +14,50 @@ func initializeCar(cli *clientv3.Client, ctx context.Context, pathToCar string) 
 
 	car := car.NewCar(pathToCar)
 
-	car_bytes, err := yaml.Marshal(car)
-	if err != nil {
-		panic(err)
-	}
-
-	carKey := CAR_PREFIX + car.Metadata.Name
-	txn.If(clientv3.Compare(clientv3.Version(carKey), "=", 0)).Then(
-		clientv3.OpPut(carKey, string(car_bytes)),
-	)
+	car.PutEtcd(cli, ctx, "")
 
 	global_car_name = car.Metadata.Name
 
 	// commit transaction
-	_, err = txn.Commit()
+	_, err := txn.Commit()
 	if err != nil {
 		panic(err)
 	}
 }
 
-// store the intersection struct and block structs into etcd
-func initializeIntersectionAndBlock(cli *clientv3.Client, ctx context.Context, pathToIntersection string) {
-	// start transaction
-	txn := cli.Txn(ctx)
-	intersection := lease.NewIntersection(pathToIntersection)
-	intersection_bytes, err := yaml.Marshal(intersection)
-	if err != nil {
-		panic(err)
-	}
+// // store the intersection struct and block structs into etcd
+// func initializeIntersectionAndBlock(cli *clientv3.Client, ctx context.Context, pathToIntersection string) {
+// 	// start transaction
+// 	txn := cli.Txn(ctx)
+// 	intersection := lease.NewIntersection(pathToIntersection)
+// 	intersection_bytes, err := yaml.Marshal(intersection)
+// 	if err != nil {
+// 		panic(err)
+// 	}
 
-	intersectionKey := INTERSECTION_PREFIX + intersection.Metadata.Name
-	txn.If(clientv3.Compare(clientv3.Version(intersectionKey), "=", 0)).Then(
-		clientv3.OpPut(intersectionKey, string(intersection_bytes)),
-	)
+// 	intersectionKey := INTERSECTION_PREFIX + intersection.Metadata.Name
+// 	txn.If(clientv3.Compare(clientv3.Version(intersectionKey), "=", 0)).Then(
+// 		clientv3.OpPut(intersectionKey, string(intersection_bytes)),
+// 	)
 
-	for _, block := range intersection.Spec.Blocks {
-		block_bytes, err := yaml.Marshal(block)
-		if err != nil {
-			panic(err)
-		}
+// 	for _, block := range intersection.Spec.Blocks {
+// 		block_bytes, err := yaml.Marshal(block)
+// 		if err != nil {
+// 			panic(err)
+// 		}
 
-		blockKey := BLOCK_PREFIX + block.Name
-		txn.If(clientv3.Compare(clientv3.Version(blockKey), "=", 0)).Then(
-			clientv3.OpPut(blockKey, string(block_bytes)),
-		)
-	}
+// 		blockKey := BLOCK_PREFIX + block.Name
+// 		txn.If(clientv3.Compare(clientv3.Version(blockKey), "=", 0)).Then(
+// 			clientv3.OpPut(blockKey, string(block_bytes)),
+// 		)
+// 	}
 
-	// commit transaction
-	_, err = txn.Commit()
-	if err != nil {
-		panic(err)
-	}
-}
+// 	// commit transaction
+// 	_, err = txn.Commit()
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// }
 
 func run(cli *clientv3.Client, ctx context.Context) {
 	var carSelf car.Car
@@ -92,7 +82,7 @@ func run(cli *clientv3.Client, ctx context.Context) {
 
 		// TODO: get the current time, position, speed, acceleration, direction of the car itself
 		// TODO: get_info(car_id, time, position, speed, acceleration, direction)
-		carSelf = car.GetCarEtcd(cli, ctx, CAR_PREFIX+global_car_name)
+		carSelf = car.GetCarEtcd(cli, ctx, global_car_name)
 		if carSelf.GetDynamics() == nil {
 			log.Println("car spec is nil")
 			continue
