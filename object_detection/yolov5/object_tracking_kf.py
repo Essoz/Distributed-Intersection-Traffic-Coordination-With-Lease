@@ -129,7 +129,7 @@ start_tuples = [(pos[0], pos[2]), (pos[1], pos[3]), (pos[2], pos[3]), (pos[3], p
 # dim = 8 * gain # 8 meters width, or 400 pixels side length
 # decay = 0.9 # 90% decay rate on old map data
 # map = np.zeros((dim, dim), dtype=np.float32) # map object
-max_distance = 4
+max_distance = 3
 new_map = []
 map = []
 mutex_map = threading.Lock()
@@ -299,12 +299,26 @@ def get_cars_dict():
         "time": time detecting these data
     }
     """
+    num = len(cars_dict.keys())
+    cars_absolute_dict = {i: cars_dict[i].copy() for i in cars_dict}
+    for car in cars_dict:
+        x_speed_qcar_cood = cars_absolute_dict[car]['speed'][0]
+        y_speed_qcar_cood = cars_absolute_dict[car]['speed'][1]
+        x_qcar_cood = cars_absolute_dict[car]['location'][0]
+        y_qcar_cood = cars_absolute_dict[car]['location'][1]
+        cars_absolute_dict_x_speed = x_speed_qcar_cood * np.cos(heading) - y_speed_qcar_cood * np.sin(heading) + current_speed * np.cos(heading)
+        cars_absolute_dict_y_speed = x_speed_qcar_cood * np.sin(heading) + y_speed_qcar_cood * np.cos(heading) + current_speed * np.sin(heading)
+        cars_absolute_dict[car]['speed'] = (cars_absolute_dict_x_speed, cars_absolute_dict_y_speed)
+        cars_absolute_dict_x = x_qcar_cood * np.cos(heading) - y_qcar_cood * np.sin(heading) + current_dist * np.cos(heading) + start_tuples[start_pos][0]
+        cars_absolute_dict_y = x_qcar_cood * np.sin(heading) + y_qcar_cood * np.cos(heading) + current_dist * np.sin(heading) + start_tuples[start_pos][1]
+        cars_absolute_dict[car]['location'] = (cars_absolute_dict_x, cars_absolute_dict_y)
 
-    return cars_dict
+    return cars_absolute_dict
+    # return cars_dict
     
 
 def get_self_speed():
-    return current_speed
+    return (current_speed * np.cos(heading), current_speed * np.sin(heading))
 
 
 def get_self_dist():
@@ -321,12 +335,11 @@ def match_cars(cars_position, timeDetect):
             cars_dict_keys = list(cars_dict.keys())
             for car_2 in cars_dict_keys:
                 possible_pos = (cars_dict[car_2]["speed"][0]*(timeDetect - cars_dict[car_2]["time"]) + cars_dict[car_2]["location"][0], cars_dict[car_2]["speed"][1]*(timeDetect - cars_dict[car_2]["time"]) + cars_dict[car_2]["location"][1])
-                if (possible_pos[0]-car_1[0])**2 + (possible_pos[1]-car_1[1])**2 < 0.2**2:
+                if (possible_pos[0]-car_1[0])**2 + (possible_pos[1]-car_1[1])**2 < 0.2**2 and not appended:
                     cars_dict[car_2]["speed"] = (0.6 * (car_1[0]-cars_dict[car_2]["location"][0]) / (timeDetect - cars_dict[car_2]["time"]) + 0.4 * cars_dict[car_2]["speed"][0], 0.6 * (car_1[1]-cars_dict[car_2]["location"][1]) / (timeDetect - cars_dict[car_2]["time"]) + 0.4 * cars_dict[car_2]["speed"][1])
                     cars_dict[car_2]["location"] = car_1
                     cars_dict[car_2]["time"] = timeDetect
                     appended = True
-                    break
                 elif timeDetect - cars_dict[car_2]["time"] > 0.5:
                     del(cars_dict[car_2])
             if not appended:
@@ -461,9 +474,12 @@ def car_control(speed):
     sampleTime = 1/sampleRate
     lastTime = None
     timeStep = sampleTime
+
+    # Initialize motor command array
+    mtr_cmd = np.array([0,0])
     ## Main Loop
     try:
-        while elapsed_time() < simulationTime:
+        while elapsed_time() < simulationTime and not thread_terminate:
             # Start timing this iteration
             start = time.time()
             if lastTime is not None:
@@ -760,6 +776,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                 match_cars(cars_position, start)
                 # match_cars([kf_position], start)
                 print("cars_dict:", cars_dict)
+                print("cars_abs_dict:", get_cars_dict())
                 print("speed:", get_self_speed())
                 print("position:", get_self_dist())
 
