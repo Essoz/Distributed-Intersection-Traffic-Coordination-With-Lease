@@ -940,7 +940,7 @@ def parse_opt():
 def main(opt):
     global start_pos, heading
     start_pos = opt.start_pos
-    heading = opt.heading
+    heading = opt.heading/180 * np.pi
     check_requirements(exclude=('tensorboard', 'thop'))
     run(**vars(opt))
 
