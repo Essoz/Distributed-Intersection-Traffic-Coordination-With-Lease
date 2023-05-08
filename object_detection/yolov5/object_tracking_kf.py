@@ -144,9 +144,10 @@ myLidar = LIDAR(num_measurements=720)
 # Qcar Drive module
 # -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 MANUAL_DRIVE = False
-SPEED = 0.2
+SPEED = 0
 diff = Calculus().differentiator_variable(1/50.0)
 next(diff)
+desired_speed = SPEED
 current_speed = 0
 current_dist = 0
 ## QCar and Gamepad Initialization
@@ -326,6 +327,11 @@ def get_self_dist():
     return dist_tuple
 
 
+def set_speed(speed):
+    global desired_speed
+    desired_speed = speed
+    return
+
 
 def match_cars(cars_position, timeDetect):
     global num_cars
@@ -468,8 +474,8 @@ def lidar_receiver(*args, **kwargs):
     return
 
 
-def car_control(speed):
-    global current_speed, current_dist, thread_terminate
+def car_control():
+    global desired_speed, current_speed, current_dist, thread_terminate
     sampleRate = 50.0
     sampleTime = 1/sampleRate
     lastTime = None
@@ -490,8 +496,8 @@ def car_control(speed):
             current_speed = basic_speed_estimation(encoderSpeed)
             current_dist = basic_speed_estimation(encoderCounts)
 
-            if current_dist > 2:
-                break
+            # if current_dist > 2:
+            #     break
 
             if MANUAL_DRIVE:
                 # Read Gamepad states
@@ -506,7 +512,8 @@ def car_control(speed):
             else:
                 mtr_cmd = np.array([0,-0.066]) 
                 # the parameter for straight run
-                mtr_cmd[0] = speed_control(speed,current_speed,1,timeStep)
+                if desired_speed != 0:
+                    mtr_cmd[0] = speed_control(desired_speed,current_speed,1,timeStep)
 
             LEDs = np.array([0, 0, 0, 0, 0, 0, 1, 1])
             # Adjust LED indicators based on steering and reverse indicators based on reverse gear
@@ -651,7 +658,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
 
     lidarThread = threading.Thread(target=lidar_receiver, args=tuple())
     cameraThread = threading.Thread(target=camera_receiver, args=(imgsz, stride, pt, onnx, device, half))
-    QcarThread = threading.Thread(target=car_control, args=(SPEED, ))
+    QcarThread = threading.Thread(target=car_control, args=tuple())
     lidarThread.start()
     cameraThread.start()
     QcarThread.start()
