@@ -31,7 +31,7 @@ from utils.plots import Annotator, colors
 from utils.torch_utils import load_classifier, select_device, time_sync
 from utils.augmentations import letterbox
 
-# multi thread
+# multi-thread
 import threading
 
 # import Qcar packages
@@ -42,6 +42,9 @@ from Quanser.q_misc import Calculus
 from Quanser.q_interpretation import lidar_frame_2_body_frame, basic_speed_estimation
 from Quanser.q_control import speed_control
 import time
+
+# config file
+import config
 
 
 # Kalman Filter
@@ -95,7 +98,7 @@ startTime = time.time()
 def elapsed_time():
     return time.time() - startTime
 
-simulationTime = 60.0
+simulationTime = 114514.0
 frameRate = 30.0
 thread_terminate = False
 print('Simulation Time: ', simulationTime)
@@ -110,6 +113,8 @@ imageHeight = 480
 horizontalBlank     = np.zeros((20, 2*imageWidth+20, 3), dtype=np.uint8)
 verticalBlank       = np.zeros((imageHeight, 20, 3), dtype=np.uint8)
 # imageBuffer360 = np.zeros((2*imageHeight + 20, 2*imageWidth + 20, 3), dtype=np.uint8) # 20 px padding between pieces
+img_transform = None
+mutex_img = threading.Lock()
 
 ## Initialize the CSI cameras
 myCam1 = Camera2D(camera_id="0", frame_width=imageWidth, frame_height=imageHeight, frame_rate=frameRate)
@@ -130,12 +135,20 @@ start_tuples = [(pos[0], pos[2]), (pos[1], pos[3]), (pos[2], pos[3]), (pos[3], p
 # decay = 0.9 # 90% decay rate on old map data
 # map = np.zeros((dim, dim), dtype=np.float32) # map object
 max_distance = 3
-new_map = []
 map = []
 mutex_map = threading.Lock()
 
-img_transform = None
-mutex_img = threading.Lock()
+# LIDAR obstacle detection
+obstacle_front = False
+obstacle_back = False
+dist_to_head = config.dist_to_head
+dist_to_tail = config.dist_to_tail
+car_width = config.car_width
+brake_acc = config.brake_acc
+head_angle = config.head_angle
+tail_angle = config.tail_angle
+collision_range_head = config.collision_range_head
+collision_range_tail = config.collision_range_tail
 
 # LIDAR initialization and measurement buffers
 myLidar = LIDAR(num_measurements=720)
@@ -143,16 +156,16 @@ myLidar = LIDAR(num_measurements=720)
 
 # Qcar Drive module
 # -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-MANUAL_DRIVE = False
-SPEED = 0
+manual_drive = config.manual_drive
 diff = Calculus().differentiator_variable(1/50.0)
 next(diff)
-desired_speed = SPEED
+desired_speed = config.speed
 current_speed = 0
 current_dist = 0
+wheel_offset = config.wheel_offset
 ## QCar and Gamepad Initialization
 myCar = QCar()
-if MANUAL_DRIVE:
+if manual_drive:
     gpad = gamepadViaTarget(1)
 
 
@@ -164,11 +177,11 @@ if kalman_on == 1:
 
 img_w = 1300
 img_h = 980
-compressed_w = 1024
-compressed_h = 800
+compressed_w = config.transformed_imgWidth
+compressed_h = config.transformed_imgHeight
 
-camera_offset = [-1.931, 1.548, 1.931, 4.235]
-pix2angle_const = 0.183988
+pix2angle_const = config.pix2angle
+camera_offset = config.camera_offset
 resize_rate_x = img_w / compressed_w
 resize_rate_y = img_h / compressed_h
 
@@ -254,13 +267,14 @@ def process_pred(pred, map):
     for car in new_cars_angle:
         dist_list = []
 
+        # angle: (-4.71, 1.57) (1.57, 7.85), car: (-1.57(maybe -3.14), 6.28(maybe 7.85))
         for angle, dist in map:
-            if (angle > 0.15*car[0] + 0.85*car[1] and angle < 0.85*car[0] + 0.15*car[1]) or\
-               (angle+2*np.pi > 0.15*car[0] + 0.85*car[1] and angle+2*np.pi < 0.85*car[0] + 0.15*car[1]):
+            if (angle > 0.2*car[0] + 0.8*car[1] and angle < 0.8*car[0] + 0.2*car[1]) or\
+               (angle+2*np.pi > 0.2*car[0] + 0.8*car[1] and angle+2*np.pi < 0.8*car[0] + 0.2*car[1]):
                 dist_list.append(dist)
 
-        print("car:", car)
-        print("dist_list:", dist_list)
+        # print("car:", car)
+        # print("dist_list:", dist_list)
 
         if dist_list:
             median = np.median(dist_list)
@@ -272,6 +286,7 @@ def process_pred(pred, map):
         else:
             print("cnm, empty dist_list")
             # print(map)
+            pass
 
     # remove redundant cars
     cars = []
@@ -401,18 +416,22 @@ def camera_receiver(imgsz=640,  # inference size (pixels)
         myCam2.terminate()
         myCam3.terminate()
         myCam4.terminate()
-
     return
 
 
 def lidar_receiver(*args, **kwargs):
-    global new_map, map, mutex_map, thread_terminate
+    global map, mutex_map, obstacle_front, obstacle_back, current_speed, thread_terminate
     sampleRate = 10.0
     sampleTime = 1/sampleRate
+    new_map = []
+    brake_dist = 0
     ## Main Loop
     try:
         while elapsed_time() < simulationTime and not thread_terminate:
             start = time.time()
+
+            if not (current_speed > 0 and obstacle_front) and not (current_speed < 0 and obstacle_back):
+                brake_dist = current_speed**2/(2*brake_acc)
 
             # LIDAR
             # Decay existing map
@@ -436,20 +455,61 @@ def lidar_receiver(*args, **kwargs):
             # pX = (dim/2 - x*gain).astype(np.uint16)
             # pY = (dim/2 - y*gain).astype(np.uint16)
             # map[pX, pY] = 1
+            obstacle_front_counts = 0
+            obstacle_back_counts = 0
 
             if map:
                 for angle, dist in map:
                     if angle > angles_in_body_frame[idx[0]]:
                         new_map.append((angle, dist))
+                        if current_speed >= -0.2 and np.abs(angle) < head_angle:
+                            x_dist = np.cos(angle)*dist
+                            y_dist = np.sin(angle)*dist
+                            if x_dist < collision_range_head + brake_dist and y_dist < car_width/2 and y_dist > -car_width/2:
+                                # print("x, y:", x_dist, y_dist)
+                                obstacle_front_counts += 1
+                        if current_speed <= 0.2 and np.abs(angle + np.pi) < tail_angle:
+                            x_dist = np.cos(angle)*dist
+                            y_dist = np.sin(angle)*dist
+                            if -x_dist < collision_range_tail + brake_dist and y_dist < car_width/2 and y_dist > -car_width/2:
+                                # print("x, y:", x_dist, y_dist)
+                                obstacle_back_counts += 1
                     else:
                         break
 
             old_angle = 0.5 * np.pi
             for angle, dist in zip(angles_in_body_frame[idx], myLidar.distances[idx]):
+                # to avoid dirty data from LIDAR
                 if angle > old_angle:
                     break
                 old_angle = angle
+
+                # append detected point cloud
                 new_map.append((angle, dist))
+                # if current_speed >= 0 and np.abs(angle) < head_angle:
+                if current_speed >= -0.2 and np.abs(angle) < head_angle:
+                    x_dist = np.cos(angle)*dist
+                    y_dist = np.sin(angle)*dist
+                    if x_dist < collision_range_head + brake_dist and y_dist < car_width/2 and y_dist > -car_width/2:
+                        # print("x, y:", x_dist, y_dist)
+                        obstacle_front_counts += 1
+                if current_speed <= 0.2 and np.abs(angle + np.pi) < tail_angle:
+                    x_dist = np.cos(angle)*dist
+                    y_dist = np.sin(angle)*dist
+                    if -x_dist < collision_range_tail + brake_dist and y_dist < car_width/2 and y_dist > -car_width/2:
+                        # print("x, y:", x_dist, y_dist)
+                        obstacle_back_counts += 1
+
+            # judge whether obstacle exists on the front/back
+            if obstacle_front_counts >= 2:
+                obstacle_front = True
+            else:
+                obstacle_front = False
+            if obstacle_back_counts >= 2:
+                obstacle_back = True
+            else:
+                obstacle_back = False
+            # print("front, back:", obstacle_front, obstacle_back)
 
             # update new map
             mutex_map.acquire()
@@ -470,20 +530,18 @@ def lidar_receiver(*args, **kwargs):
         print("terminate LIDAR")
         # Terminate the LIDAR object
         myLidar.terminate()
-
     return
 
 
 def car_control():
-    global desired_speed, current_speed, current_dist, thread_terminate
+    global obstacle_front, obstacle_back, desired_speed, current_speed, current_dist, thread_terminate
     sampleRate = 50.0
     sampleTime = 1/sampleRate
     lastTime = None
     timeStep = sampleTime
 
-    # Initialize motor command array
-    mtr_cmd = np.array([0,0])
     ## Main Loop
+    mtr_cmd = np.array([0, wheel_offset])
     try:
         while elapsed_time() < simulationTime and not thread_terminate:
             # Start timing this iteration
@@ -491,7 +549,7 @@ def car_control():
             if lastTime is not None:
                 timeStep = start - lastTime
 
-            _,_, encoderCounts = myCar.read_std()  
+            _,_, encoderCounts = myCar.read_std()
             encoderSpeed = diff.send((encoderCounts, timeStep))
             current_speed = basic_speed_estimation(encoderSpeed)
             current_dist = basic_speed_estimation(encoderCounts)
@@ -499,35 +557,53 @@ def car_control():
             # if current_dist > 2:
             #     break
 
-            if MANUAL_DRIVE:
+            if manual_drive:
                 # Read Gamepad states
                 new = gpad.read()
 
                 # Basic IO - write motor commands
                 if new:
-                    if gpad.LT:
-                        mtr_cmd = np.array([-0.3*gpad.LT, -0.066])
+                    if gpad.RT and not gpad.LT:
+                        mtr_cmd[0] = 0.3*gpad.RT
+                    elif gpad.LT and not gpad.RT:
+                        mtr_cmd[0] = -0.3*gpad.LT
                     else:
-                        mtr_cmd = np.array([0.3*gpad.RT, -0.066])
+                        mtr_cmd[0] = 0
+
+                if mtr_cmd[0] > 0 and obstacle_front:
+                    mtr_cmd[0] = 0
+                elif mtr_cmd[0] < 0 and obstacle_back:
+                    mtr_cmd[0] = 0
+                elif mtr_cmd[0] == 0:
+                    if gpad.RT and not gpad.LT:
+                        if not obstacle_front:
+                            mtr_cmd[0] = 0.3*gpad.RT
+                    elif gpad.LT and not gpad.RT:
+                        if not obstacle_back:
+                            mtr_cmd[0] = -0.3*gpad.LT
+                    else:
+                        mtr_cmd[0] = 0
+                print("speed:", current_speed)
+
             else:
-                mtr_cmd = np.array([0,-0.066]) 
+                mtr_cmd[0] = 0
                 # the parameter for straight run
-                if desired_speed != 0:
+                if (desired_speed > 0 and not obstacle_front) or (desired_speed < 0 and not obstacle_back):
                     mtr_cmd[0] = speed_control(desired_speed,current_speed,1,timeStep)
 
-            LEDs = np.array([0, 0, 0, 0, 0, 0, 1, 1])
+            # LEDs = np.array([0, 0, 0, 0, 0, 0, 1, 1])
             # Adjust LED indicators based on steering and reverse indicators based on reverse gear
-            if mtr_cmd[1] > 0.3:
-                LEDs[0] = 1
-                LEDs[2] = 1
-            elif mtr_cmd[1] < -0.3:
-                LEDs[1] = 1
-                LEDs[3] = 1
-            if mtr_cmd[0] < 0:
-                LEDs[5] = 1
+            # if mtr_cmd[1] > 0.3:
+            #     LEDs[0] = 1
+            #     LEDs[2] = 1
+            # elif mtr_cmd[1] < -0.3:
+            #     LEDs[1] = 1
+            #     LEDs[3] = 1
+            # if mtr_cmd[0] < 0:
+            #     LEDs[5] = 1
 
             myCar.write_mtrs(mtr_cmd)
-            myCar.write_LEDs(LEDs)
+            # myCar.write_LEDs(LEDs)
 
             # End timing this iteration
             end = time.time()
@@ -547,6 +623,8 @@ def car_control():
         print("terminate QCar")
         # Terminate the LIDAR object
         myCar.terminate()
+    return
+
 
 
 @torch.no_grad()
@@ -960,8 +1038,8 @@ def run_http_serve():
 if __name__ == "__main__":
     opt = parse_opt()
 
-    http_thread = threading.Thread(target=run_http_serve)
-    http_thread.start()
+    # http_thread = threading.Thread(target=run_http_serve)
+    # http_thread.start()
     
     main(opt)
 
