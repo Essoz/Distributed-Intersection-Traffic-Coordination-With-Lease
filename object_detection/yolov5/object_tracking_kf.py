@@ -430,7 +430,9 @@ def lidar_receiver(*args, **kwargs):
         while elapsed_time() < simulationTime and not thread_terminate:
             start = time.time()
 
-            if not (current_speed > 0 and obstacle_front) and not (current_speed < 0 and obstacle_back):
+            if (current_speed > 0 and obstacle_front) or (current_speed < 0 and obstacle_back):
+                brake_dist = current_speed**2/(2*brake_acc) + 0.2
+            else:
                 brake_dist = current_speed**2/(2*brake_acc)
 
             # LIDAR
@@ -583,7 +585,7 @@ def car_control():
                             mtr_cmd[0] = -0.3*gpad.LT
                     else:
                         mtr_cmd[0] = 0
-                print("speed:", current_speed)
+                # print("speed:", current_speed)
 
             else:
                 mtr_cmd[0] = 0
@@ -817,7 +819,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
 
             # information of detected cars
             cars_position = process_pred(pred, map_copy)
-            print(f"position of cars: {cars_position}")
+            # print(f"position of cars: {cars_position}")
 
             det = pred[0]
             s = '%gx%g ' % img.shape[2:]
@@ -863,10 +865,10 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                 # match cars
                 match_cars(cars_position, start)
                 # match_cars([kf_position], start)
-                print("cars_dict:", cars_dict)
-                print("cars_abs_dict:", get_cars_dict())
-                print("speed:", get_self_speed())
-                print("position:", get_self_dist())
+                # print("cars_dict:", cars_dict)
+                # print("cars_abs_dict:", get_cars_dict())
+                # print("speed:", get_self_speed())
+                # print("position:", get_self_dist())
 
 
             # sleepTime = sampleTime - (computationTime % sampleTime)
