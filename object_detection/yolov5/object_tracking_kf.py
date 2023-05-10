@@ -374,9 +374,6 @@ def match_cars(cars_position, timeDetect):
 def camera_receiver(imgsz=640,  # inference size (pixels)
                     stride=32,
                     pt=True,
-                    onnx=False,
-                    device='',
-                    half=False,  # use FP16 half-precision inference
                     ):
     global img_transform, mutex_img, thread_terminate
     sampleRate = 10.0
@@ -737,7 +734,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
     # vid_path, vid_writer = [None] * bs, [None] * bs
 
     lidarThread = threading.Thread(target=lidar_receiver, args=tuple())
-    cameraThread = threading.Thread(target=camera_receiver, args=(imgsz, stride, pt, onnx, device, half))
+    cameraThread = threading.Thread(target=camera_receiver, args=(imgsz, stride, pt))
     QcarThread = threading.Thread(target=car_control, args=tuple())
     lidarThread.start()
     cameraThread.start()

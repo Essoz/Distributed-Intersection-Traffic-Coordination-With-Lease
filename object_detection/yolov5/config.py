@@ -12,7 +12,7 @@ pix2angle = 0.183988
 # camera_offset_12 = [-1.931, 1.548, 1.931, 4.235]
 camera_offset = [-2.144, 0, -3.215, 0]
 # wheel_offset_12 = -0.066
-wheel_offset = -0.042
+wheel_offset = -0.041
 
 dist_to_head = 0.23
 dist_to_tail = 0.19
