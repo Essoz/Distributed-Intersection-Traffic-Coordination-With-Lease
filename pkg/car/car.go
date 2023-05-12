@@ -1,6 +1,7 @@
 package car
 
 import (
+	"math"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -55,4 +56,27 @@ func (c *Car) GetLocation() []float64 {
 
 func (c *Car) GetSpeed() []float64 {
 	return c.Dynamics.Speed
+}
+
+func (c *Car) GetDestination() []float64 {
+	return c.Dynamics.Destination
+}
+
+/*
+ * Returns true if the car is at the destination, false otherwise
+ * Input:
+ *   - allowedError: the allowed error in meters
+ */
+func (c *Car) IsCarAtDestination(allowedError float64) bool {
+	currLocation := c.GetLocation()
+	destination := c.GetDestination()
+
+	// if there's no destination, then the car is at the destination
+	if len(destination) == 0 {
+		return true
+	}
+
+	// check the distance between the current location and the destination
+	distance := math.Sqrt(math.Pow(currLocation[0]-destination[0], 2) + math.Pow(currLocation[1]-destination[1], 2))
+	return distance <= allowedError
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -58,5 +59,11 @@ import (
 // }
 
 func Run(cli *clientv3.Client, ctx context.Context) {
-	RunPerceptionService(cli, ctx, global_car_name)
+	go RunPerceptionService(cli, ctx, global_car_name)
+	go RunControlService(cli, ctx, global_car_name, "NULL")
+
+	for {
+		// fmt.Println("Running")
+		time.Sleep(10 * time.Second)
+	}
 }

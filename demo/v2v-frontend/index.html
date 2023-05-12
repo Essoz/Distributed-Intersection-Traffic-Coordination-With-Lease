@@ -8,15 +8,46 @@
     #map {
       position: relative;
       width: 800px;
-      height: 600px;
+      height: 800px;
       border: 1px solid black;
+      background-color: #7b7b7b;
     }
     .car {
       position: absolute;
-      width: 5px;
-      height: 5px;
+      width: 15px;  
+      height: 15px;
       border-radius: 50%;
       background-color: red;
+    }
+    .lane {
+      position: absolute;
+      background-color: #ffffff;
+    }
+
+    .horizontal-lane {
+      height: 4px;
+      width: 100%;
+    }
+
+    .vertical-lane {
+      height: 100%;
+      width: 4px;
+    }
+
+    .intersection {
+      position: absolute;
+      height: 10px;
+      width: 10px;
+      background-color: #696969;
+      border: 2px dashed rgba(255, 255, 255, 0.829);
+    }
+    
+    .buttons {
+      position: flex;
+      top: 0;
+      left: 0;
+      padding: 8px;
+      background-color: #616161;
     }
   </style>
 </head>
@@ -25,21 +56,58 @@
   <script>
     const mapElement = document.getElementById('map');
 
+    const map_size = 3.2;
+    const map_pixels = 800;
+    const map_scale = map_pixels / map_size;
+
+    const lane_start = 1.2;
+    const lane_end = 2.0;
+    const lane_spacing = 0.4;
+
     const fetchData = async () => {
       const response = await fetch('http://localhost:11002/car/getAll');
       const data = await response.json();
       return data;
     };
 
+    const renderLanes = () => {
+      // Horizontal lanes
+      for (let y = lane_start; y <= lane_end; y += lane_spacing) {
+        const lane = document.createElement('div');
+        lane.classList.add('lane', 'horizontal-lane');
+        lane.style.top = `${y*map_scale}px`;
+        mapElement.appendChild(lane);
+      }
+
+      // Vertical lanes
+      for (let x = lane_start; x <= lane_end; x += lane_spacing) {
+        const lane = document.createElement('div');
+        lane.classList.add('lane', 'vertical-lane');
+        lane.style.left = `${x*map_scale}px`;
+        mapElement.appendChild(lane);
+      }
+
+      // Intersection
+      const intersection = document.createElement('div');
+      intersection.classList.add('intersection');
+      intersection.style.left = `${lane_start*map_scale}px`;
+      intersection.style.top = `${lane_start*map_scale}px`;
+      // scale the intersection so right and bottom also meets the requirements
+      intersection.style.height = `${(lane_end - lane_start)*map_scale}px`;
+      intersection.style.width = `${(lane_end - lane_start)*map_scale}px`;
+      mapElement.appendChild(intersection);
+    };
+
     const renderCars = (carData) => {
       mapElement.innerHTML = '';
 
+      renderLanes();
       carData.forEach((car) => {
         const carElement = document.createElement('div');
         carElement.classList.add('car');
         const [x, y] = car.dynamics.location;
-        carElement.style.left = `${x}px`;
-        carElement.style.top = `${y}px`;
+        carElement.style.left = `${x*map_scale}px`;
+        carElement.style.top = `${(map_size - y)*map_scale}px`;
 
         const carLabel = document.createElement('span');
         carLabel.textContent = car.metadata.name;
@@ -48,11 +116,29 @@
         carLabel.style.top = '-2px';
         carLabel.style.fontSize = '12px';
         carLabel.style.whiteSpace = 'nowrap';
+        // also append the coordinates of the car
+        carLabel.textContent += ` (${x.toFixed(2)}, ${y.toFixed(2)})`;
 
         carElement.appendChild(carLabel);
         mapElement.appendChild(carElement);
       });
+
+      // also draw a car at 0,0
+      const carElement = document.createElement('div');
+      carElement.classList.add('car');
+      carElement.style.left = `${0*map_scale}px`;
+      carElement.style.top = `${0*map_scale}px`;
+
+      const carLabel = document.createElement('span');
+      carLabel.textContent = '0,0';
+      carLabel.style.position = 'absolute';
+      carLabel.style.left = '8px';
+      carLabel.style.top = '-2px';
+
+
     };
+
+    renderLanes();
 
     const refreshInterval = 100;
     const updateCarLocations = async () => {
@@ -67,5 +153,74 @@
     setInterval(updateCarLocations, refreshInterval);
     updateCarLocations();
   </script>
+
+  <div class="buttons">
+    Utils
+    <button id="button_clear_all_destination">Stop Vehicles</button>
+
+    <button id="button_set_car_location">Set Car Location</button>
+    <button id="button_set_car_destination">Set Car Destination</button>
+    <input id="input_car_name" type="text" placeholder="Car Name">
+    <input id="input_car_x" type="number" placeholder="X">
+    <input id="input_car_y" type="number" placeholder="Y">
+
+  </div>
+  <script>
+    document.getElementById('button_clear_all_destination').addEventListener('click', async () => {
+      console.log('Button Stop All Vehicles clicked');
+      const requestOptions = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      };
+      // Replace the URL with the desired endpoint for the request
+      const response = await fetch('http://localhost:11002/utils/clearAllCarDestination', requestOptions);
+      const data = await response.json(); // wait for the response to finish
+    });
+
+    document.getElementById('button_set_car_location').addEventListener('click', async () => {
+      console.log('Button Set Car Location clicked');
+      const carName = document.getElementById('input_car_name').value;
+      const carX = parseFloat(document.getElementById('input_car_x').value);
+      const carY = parseFloat(document.getElementById('input_car_y').value);
+
+      const data = {
+        carName: carName,
+        location: [carX, carY],
+      };
+
+      const requestOptions = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      };
+
+      console.log("requestOptions", requestOptions)
+
+      const response = await fetch('http://localhost:11002/car/setLocation', requestOptions);
+      const responseData = await response.text();
+    })
+
+    document.getElementById('button_set_car_destination').addEventListener('click', async () => {
+      console.log('Button Set Car Destination clicked');
+      const carName = document.getElementById('input_car_name').value;
+      const carX = parseFloat(document.getElementById('input_car_x').value);
+      const carY = parseFloat(document.getElementById('input_car_y').value);
+
+      const data = {
+        carName: carName,
+        destination: [carX, carY],
+      };
+
+      const requestOptions = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      };
+
+      const response = await fetch('http://localhost:11002/car/setDestination', requestOptions);
+      const responseData = await response.text();
+    })
+  </script>
+
 </body>
 </html>

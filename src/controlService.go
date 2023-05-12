@@ -1,13 +1,35 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"log"
+	"net/http"
+	"time"
 
 	"github.com/essoz/car-backend/pkg/car"
-	"github.com/essoz/car-backend/pkg/lease"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"google.golang.org/appengine/log"
 )
+
+const (
+	CONTROL_SERVICE_PORT   = "11001"
+	ALLOWED_ERROR_LOCATION = 0.1 // in meters
+	RECOMMENDED_SPEED      = 0.3 // in meters per second
+	STOP_SPEED             = 0.0 // in meters per second
+	CHECK_INTERVAL         = 100 * time.Millisecond
+)
+
+func setCarSelfSpeed(ctx context.Context, speed float64) {
+	url := "http://localhost:" + CONTROL_SERVICE_PORT + "/control/setSelfSpeed"
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer([]byte(fmt.Sprintf(`{"speed": %f}`, speed))))
+	if err != nil {
+		log.Fatalf("Failed to make a request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// no need to check data as long as the request is 200
+}
 
 // Given a car key, it will run the control service for that car
 // Three kinds of actions will happen, depending on the car's state:
@@ -16,56 +38,29 @@ import (
 //  2. Crossing state: The car is waiting for the intersection to be clear
 //  3. Post-crossing state:
 func RunControlService(cli *clientv3.Client, ctx context.Context, carName string, intersectionName string) {
+	// intersection := lease.GetIntersectionEtcd(cli, ctx, intersectionName)
+	log.Print("Control service is running for car ", carName)
 
-	intersection := lease.GetIntersectionEtcd(cli, ctx, intersectionName)
 	currCar := car.GetCarEtcd(cli, ctx, carName)
-
 	// TODO: wait for MASTER's command to start
-
 	for {
-		currCar = car.GetCarEtcd(cli, ctx, carName) // No need to keep fetching from etcd as we can maintain no other entities will write to the car's etcd
-		switch currCar.GetStage() {
-		case car.CarDynamicsStagePlanning:
-			panic("Not implemented")
-			// get the leases related to the current car
-			leases := lease.GetLeasesRelatedToCarEtcd(cli, ctx, carName)
+		currCar = car.GetCarEtcd(cli, ctx, carName)
+		// TODO: Check if the car is at its current destination, if so, loop back to the beginning
 
-			// if there are no leases, then the car is not going to enter the intersection
-			if len(leases) == 0 {
-				continue
-			}
+		for !currCar.IsCarAtDestination(ALLOWED_ERROR_LOCATION) {
+			log.Println("Car is not at destination, running")
+			// NOTE: this is a simplified version of the control service, which only checks the current location and speed
+			// The destination does not determine the orientation of the car. In other words, we assume the destination to be always at the front of the car
+			setCarSelfSpeed(ctx, RECOMMENDED_SPEED)
 
-			// get the first lease that the car will enter
-			FirstLease := leases[0]
-			if FirstLease.IsUpcoming() == false {
-				log.Errorf(ctx, "car %s is not going to enter the intersection", carName)
-				continue
-			}
-
-			// estimate the time it takes to reach the first lease
-			// timeToFirstLease := currCar.TimeToEnter(intersection.Spec.Position[0]) // FIXME: Coordinate system
-
-			// calculate the speed the car should be at in order to meet the leasing requirements
-
-			// recommenedSpeed := 123
-			// make control movements
-			// currCar.UpdateSpeed(recommenedSpeed).PutEtcd(cli, ctx)
-
-		case car.CarDynamicsStageCrossing:
-			continue
-			panic("Not implemented")
-		case car.CarDynamicsStageCrossed:
-			continue
-			panic("Not implemented")
+			time.Sleep(CHECK_INTERVAL)
+			currCar = car.GetCarEtcd(cli, ctx, carName) // No need to keep fetching from etcd as we can maintain no other entities will write to the car's etcd
 		}
 
-		// car stage update
-		if currCar.GetStage() == car.CarDynamicsStagePlanning &&
-			intersection.IsVehicleInsideIntersection(currCar.GetLocation()) {
-			currCar.UpdateStage(car.CarDynamicsStageCrossing).PutEtcd(cli, ctx, "")
-		} else if currCar.GetStage() == car.CarDynamicsStageCrossing &&
-			!intersection.IsVehicleInsideIntersection(currCar.GetLocation()) {
-			currCar.UpdateStage(car.CarDynamicsStageCrossed).PutEtcd(cli, ctx, "")
-		}
+		setCarSelfSpeed(ctx, STOP_SPEED)
+
+		log.Println("no new destination found, checking again in 1 second")
+		time.Sleep(10 * CHECK_INTERVAL)
 	}
+
 }

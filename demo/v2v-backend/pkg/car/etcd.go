@@ -2,6 +2,7 @@ package car
 
 import (
 	"context"
+	"log"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"gopkg.in/yaml.v3"
@@ -45,7 +46,7 @@ func GetAllCarsEtcd(cli *clientv3.Client, ctx context.Context, prefix string) []
 	return cars
 }
 
-func GetAllCarsWithKeyEtcd(cli *clientv3.Client, ctx context.Context, prefix string) map[string]*Car {
+func GetAllCarsWithKeyEtcd(cli *clientv3.Client, ctx context.Context, prefix string) []*Car {
 	car_prefix := CAR_ETCD_PREFIX + prefix
 
 	resp, err := cli.Get(ctx, car_prefix, clientv3.WithPrefix())
@@ -53,14 +54,15 @@ func GetAllCarsWithKeyEtcd(cli *clientv3.Client, ctx context.Context, prefix str
 		panic(err)
 	}
 
-	cars := make(map[string]*Car)
+	var cars []*Car
 	for _, ev := range resp.Kvs {
 		var car Car
 		err = yaml.Unmarshal(ev.Value, &car)
 		if err != nil {
 			panic(err)
 		}
-		cars[string(ev.Key)] = &car
+		car.Metadata.Name = string(ev.Key)
+		cars = append(cars, &car)
 	}
 
 	return cars
@@ -73,7 +75,7 @@ func (c *Car) PutEtcd(cli *clientv3.Client, ctx context.Context, prefix string) 
 	if err != nil {
 		panic(err)
 	}
-
+	log.Println("put car to etcd: ", car_prefix+c.GetName())
 	_, err = cli.Put(ctx, car_prefix+c.GetName(), string(car_bytes))
 	if err != nil {
 		panic(err)
