@@ -342,6 +342,9 @@ def get_self_dist():
     return dist_tuple
 
 
+def get_heading():
+    return heading
+
 def set_speed(speed):
     global desired_speed
     desired_speed = speed
