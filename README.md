@@ -5,3 +5,7 @@
 ## Installation
 
 ### Prerequisites
+
+### Utils
+
+tmux send-keys -t foss:etcd 'echo hello qcar' C-m

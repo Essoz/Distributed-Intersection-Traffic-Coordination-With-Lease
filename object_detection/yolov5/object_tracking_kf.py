@@ -1052,8 +1052,8 @@ def run_http_serve():
 if __name__ == "__main__":
     opt = parse_opt()
 
-    # http_thread = threading.Thread(target=run_http_serve)
-    # http_thread.start()
+    http_thread = threading.Thread(target=run_http_serve)
+    http_thread.start()
     
     main(opt)
 

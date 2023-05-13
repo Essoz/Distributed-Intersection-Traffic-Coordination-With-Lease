@@ -55,6 +55,21 @@ func main() {
 		time.Sleep(1 * time.Second)
 	}
 
+	// wait for 11001 port to be open
+	for {
+		log.Println("Waiting for perceptionService (port 11001) to be running...")
+		conn, err := net.Dial("tcp", "localhost:11001")
+		if err == nil {
+			log.Println("perceptionService is running")
+			conn.Close()
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	// finally, wait for 10 seconds to make sure everything is ready
+	time.Sleep(10 * time.Second)
+
 	// let global_car_name be the hostname network address
 	global_car_name = GetLocalIP()
 

@@ -25,9 +25,9 @@ func GetCarEtcd(cli *clientv3.Client, ctx context.Context, carName string) Car {
 }
 
 func GetAllCarsEtcd(cli *clientv3.Client, ctx context.Context, prefix string) []*Car {
-	car_prefix := CAR_ETCD_PREFIX + prefix
+	carPrefix := CAR_ETCD_PREFIX + prefix
 
-	resp, err := cli.Get(ctx, car_prefix, clientv3.WithPrefix())
+	resp, err := cli.Get(ctx, carPrefix, clientv3.WithPrefix())
 	if err != nil {
 		panic(err)
 	}
@@ -46,9 +46,9 @@ func GetAllCarsEtcd(cli *clientv3.Client, ctx context.Context, prefix string) []
 }
 
 func GetAllCarsWithKeyEtcd(cli *clientv3.Client, ctx context.Context, prefix string) map[string]*Car {
-	car_prefix := CAR_ETCD_PREFIX + prefix
+	carPrefix := CAR_ETCD_PREFIX + prefix
 
-	resp, err := cli.Get(ctx, car_prefix, clientv3.WithPrefix())
+	resp, err := cli.Get(ctx, carPrefix, clientv3.WithPrefix())
 	if err != nil {
 		panic(err)
 	}
@@ -67,14 +67,14 @@ func GetAllCarsWithKeyEtcd(cli *clientv3.Client, ctx context.Context, prefix str
 }
 
 func (c *Car) PutEtcd(cli *clientv3.Client, ctx context.Context, prefix string) {
-	car_prefix := CAR_ETCD_PREFIX + prefix
+	carPrefix := CAR_ETCD_PREFIX + prefix
 
-	car_bytes, err := yaml.Marshal(*c)
+	carBytes, err := yaml.Marshal(*c)
 	if err != nil {
 		panic(err)
 	}
 
-	_, err = cli.Put(ctx, car_prefix+c.GetName(), string(car_bytes))
+	_, err = cli.Put(ctx, carPrefix+c.GetName(), string(carBytes))
 	if err != nil {
 		panic(err)
 	}
@@ -113,8 +113,8 @@ func (c *Car) UpdateSurroundingCarsEtcd(cli *clientv3.Client, ctx context.Contex
 }
 
 func DeleteCarEtcd(cli *clientv3.Client, ctx context.Context, carName string, prefix string) {
-	car_prefix := CAR_ETCD_PREFIX + prefix
-	_, err := cli.Delete(ctx, car_prefix+carName)
+	carPrefix := CAR_ETCD_PREFIX + prefix
+	_, err := cli.Delete(ctx, carPrefix+carName)
 	if err != nil {
 		panic(err)
 	}

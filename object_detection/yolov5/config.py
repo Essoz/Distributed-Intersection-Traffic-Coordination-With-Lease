@@ -1,6 +1,9 @@
 import numpy as np
+import socket
 
-manual_drive = True
+hostname = socket.gethostname()
+
+manual_drive = False
 speed = 0
 imgWidth = 1300
 imgHeight = 980
@@ -9,10 +12,12 @@ transformed_imgHeight = 800
 pix2angle = 0.183988
 
 # parameters for car 192.168.2.12
-# camera_offset_12 = [-1.931, 1.548, 1.931, 4.235]
-camera_offset = [-2.144, 0, -3.215, 0]
-# wheel_offset_12 = -0.066
-wheel_offset = -0.041
+if hostname.strip() == 'qcar-50577':
+    camera_offset = [-1.931, 1.548, 1.931, 4.235]
+    wheel_offset = -0.066
+else: 
+    camera_offset = [-2.144, 0, -3.215, 0]
+    wheel_offset = -0.041
 
 dist_to_head = 0.23
 dist_to_tail = 0.19

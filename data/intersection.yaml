@@ -1,11 +1,11 @@
 metadata:
-  name: intersection
+  name: intersection1
 spec:
-  size: [100, 100]
-  position: [109, 109] # relative to world (0 is at the start of the road)
+  size: [0.8, 0.8]
+  position: [1.2, 1.2] # relative to world (0 is at the start of the road)
   splitIndex: 1
   blocks:
     - name: block1
       position: [0, 0] # relative to intersection
-      size: [100, 100]
+      size: [0.8, 0.8]
 # Path: data/intersection.yaml

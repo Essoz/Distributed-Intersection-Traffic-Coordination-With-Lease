@@ -69,8 +69,10 @@ func GetLeasesRelatedToCarEtcd(cli *clientv3.Client, ctx context.Context, carNam
 	return leases
 }
 
-func GetIntersectionEtcd(cli *clientv3.Client, ctx context.Context, intersectionName string) Intersection {
-	resp, err := cli.Get(ctx, INTERSECTION_ETCD_PREFIX+intersectionName)
+func GetIntersectionEtcd(cli *clientv3.Client, ctx context.Context, intersectionName string, prefix string) Intersection {
+	intersectionPrefix := INTERSECTION_ETCD_PREFIX + prefix
+
+	resp, err := cli.Get(ctx, intersectionPrefix+intersectionName)
 	if err != nil {
 		panic(err)
 	}
@@ -82,4 +84,31 @@ func GetIntersectionEtcd(cli *clientv3.Client, ctx context.Context, intersection
 	}
 
 	return intersection
+}
+
+func (i *Intersection) PutEtcd(cli *clientv3.Client, ctx context.Context, prefix string) {
+	intersectionPrefix := INTERSECTION_ETCD_PREFIX + prefix
+	intersectionBytes, err := yaml.Marshal(*i)
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = cli.Put(ctx, intersectionPrefix+i.Metadata.Name, string(intersectionBytes))
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (b *Block) PutEtcd(cli *clientv3.Client, ctx context.Context, prefix string) {
+	blockPrefix := BLOCK_ETCD_PREFIX + prefix
+
+	blockBytes, err := yaml.Marshal(*b)
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = cli.Put(ctx, blockPrefix+b.GetName(), string(blockBytes))
+	if err != nil {
+		panic(err)
+	}
 }

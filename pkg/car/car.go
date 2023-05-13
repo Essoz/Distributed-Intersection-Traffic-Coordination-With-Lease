@@ -80,3 +80,25 @@ func (c *Car) IsCarAtDestination(allowedError float64) bool {
 	distance := math.Sqrt(math.Pow(currLocation[0]-destination[0], 2) + math.Pow(currLocation[1]-destination[1], 2))
 	return distance <= allowedError
 }
+
+/*
+ * Returns true if the destination is ahead of the car, false otherwise
+ * Note that this function is a hack for our demo where car movements are simplified
+ * to one dimension. We need this function to determine whether the assigned destinations
+ * are ahead of the car or not. If not, we do not run the lease algorithm.
+ */
+func (c *Car) IsDestinationAhead() bool {
+	currLocation := c.GetLocation()
+	destination := c.GetDestination()
+
+	// if there's no destination, then the car is at the destination
+	if len(destination) == 0 {
+		return true
+	}
+
+	diff := []float64{destination[0] - currLocation[0], destination[1] - currLocation[1]}
+	if diff[0] < 0 || diff[1] < 0 {
+		return false
+	}
+	return true
+}
