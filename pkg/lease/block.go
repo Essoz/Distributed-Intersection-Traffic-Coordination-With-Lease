@@ -56,6 +56,15 @@ func (b *Block) GetCurrentLease(currentTime int) Lease {
 	return Lease{}
 }
 
+func (b *Block) ExtendUpcomingLease(inputTime int, extendTime int){
+	for _, lease := range b.Spec.Leases {
+		if lease.StartTime > inputTime {
+			lease.DelayStartTime(lease.StartTime + extendTime)
+			lease.ExtendEndTime(lease.EndTime + extendTime)
+		}
+	}
+}
+
 func (b *Block) addNewLease(lease Lease) {
 	b.Spec.Leases = append(b.GetLeases(), lease)
 }

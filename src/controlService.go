@@ -24,6 +24,7 @@ const (
 	CAR_DIST_HEAD          = 0.23 // in meters
 	CAR_DIST_TAIL          = 0.19 // in meters
 	ALLOWED_ERROR_TIME_EXTENDING = 100 // in milliseconds
+	LEASE_EXTEND_DURATION = 500 // in milliseconds
 )
 
 func setCarSelfSpeed(ctx context.Context, speed float64) {
@@ -202,10 +203,15 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 				currTime := int(time.Now().UnixNano() / int64(time.Millisecond))
 
 				currBlock := getCurrBlock(cli, ctx)
-				recentPastLease := currBlock.GetRecentPastLease(currTime)
-				if currTime > currBlock.Spec.Leases[currBlock.GetMatchedLeaseIndex(recentPastLease)].EndTime + ALLOWED_ERROR_TIME_EXTENDING {
-
+				recentPastLease := currBlock.GetCarLease(carName)
+				if currTime > recentPastLease.EndTime + ALLOWED_ERROR_TIME_EXTENDING {
+					// extend the lease of the car itself (end only)
+					currentEndTime := currBlock.GetCarLease(carName).EndTime
+					currBlock.GetCarLease(carName).EndTime = currTime + LEASE_EXTEND_DURATION
+					// extend the upcoming leases (start and end)	
+					currBlock.ExtendUpcomingLease(currentEndTime, LEASE_EXTEND_DURATION)
 				}
+				currBlock.PutEtcd(cli, ctx, "")
 
 			} else if stage == "planning" {
 				log.Println("planning state")
