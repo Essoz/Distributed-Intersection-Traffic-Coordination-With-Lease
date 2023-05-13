@@ -40,6 +40,21 @@ func getCurrBlock(cli *clientv3.Client, ctx context.Context) lease.Block {
 	return blocks[0]
 }
 
+func getDistToBlock(currCar car.Car, currBlock lease.Block) float64 {
+	// find the closest boundary to the car
+	var dist float64
+
+	currLoc := currCar.GetLocation()
+	xDiff1 := currLoc[0] - currBlock.Spec.Location[0]
+	xDiff2 := currLoc[0] - currBlock.Spec.Location[0] + currBlock.Spec.Size[0]
+
+	yDiff1 := currLoc[1] - currBlock.Spec.Location[1]
+	yDiff2 := currLoc[1] - currBlock.Spec.Location[1] + currBlock.Spec.Size[1]
+
+	if xDiff1 * xDiff2 < 0 {
+		
+}
+
 // Given a car key, it will run the control service for that car
 // Three kinds of actions will happen, depending on the car's state:
 //  1. Planning state: The car is about to enter the intersection, and it will plan its path
