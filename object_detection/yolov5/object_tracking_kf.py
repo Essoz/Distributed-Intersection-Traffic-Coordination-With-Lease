@@ -343,7 +343,7 @@ def get_self_dist():
 
 
 def get_heading():
-    return heading
+    return (np.cos(heading), np.sin(heading))
 
 def set_speed(speed):
     global desired_speed
