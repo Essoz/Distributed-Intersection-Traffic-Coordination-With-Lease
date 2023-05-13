@@ -2,6 +2,7 @@ package lease
 
 import (
 	"errors"
+	"log"
 )
 
 // get block name
@@ -19,6 +20,30 @@ func (b *Block) CleanPastLeases(currentTime int) {
 			b.Spec.Leases = append(b.GetLeases()[:i], b.GetLeases()[i+1:]...)
 		}
 	}
+}
+
+func (b *Block) GetRecentPastLease(currentTime int) Lease {
+	max_time := 0
+	var recent_lease Lease
+	for _, lease := range b.GetLeases() {
+		if lease.EndTime < currentTime {
+			if lease.EndTime > max_time {
+				max_time = lease.EndTime
+				recent_lease = lease
+			}
+		}
+	}
+	return recent_lease
+}
+
+func (b *Block) GetMatchedLeaseIndex(input_lease Lease) int {
+	for i, lease := range b.GetLeases() {
+		if lease.CarName == input_lease.CarName && lease.BlockName == input_lease.BlockName {
+			return i
+		}
+	}
+	log.Println("No matched lease found")
+	return -1
 }
 
 func (b *Block) GetCurrentLease(currentTime int) Lease {

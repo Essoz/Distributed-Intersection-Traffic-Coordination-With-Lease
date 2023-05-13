@@ -23,6 +23,7 @@ const (
 	CHECK_INTERVAL         = 100 * time.Millisecond
 	CAR_DIST_HEAD          = 0.23 // in meters
 	CAR_DIST_TAIL          = 0.19 // in meters
+	ALLOWED_ERROR_TIME_EXTENDING = 100 // in milliseconds
 )
 
 func setCarSelfSpeed(ctx context.Context, speed float64) {
@@ -196,6 +197,16 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 						putBlock
 					}
 				*/
+
+				// get current time in seconds
+				currTime := int(time.Now().UnixNano() / int64(time.Millisecond))
+
+				currBlock := getCurrBlock(cli, ctx)
+				recentPastLease := currBlock.GetRecentPastLease(currTime)
+				if currTime > currBlock.Spec.Leases[currBlock.GetMatchedLeaseIndex(recentPastLease)].EndTime + ALLOWED_ERROR_TIME_EXTENDING {
+
+				}
+
 			} else if stage == "planning" {
 				log.Println("planning state")
 
