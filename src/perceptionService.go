@@ -16,32 +16,32 @@ const (
 	PERCEPTION_SERVICE_PORT = "11001"
 )
 
-// func getCarSelfSpeed(ctx context.Context) []float64 {
-// 	url := "http://localhost:" + PERCEPTION_SERVICE_PORT + "/perception/getSelfSpeed"
-// 	resp, err := http.Get(url)
-// 	if err != nil {
-// 		log.Fatalf("Failed to make a request: %v", err)
-// 	}
-// 	defer resp.Body.Close()
+func getCarSelfSpeed(ctx context.Context) []float64 {
+	url := "http://localhost:" + PERCEPTION_SERVICE_PORT + "/perception/getSelfSpeed"
+	resp, err := http.Get(url)
+	if err != nil {
+		log.Fatalf("Failed to make a request: %v", err)
+	}
+	defer resp.Body.Close()
 
-// 	body, err := ioutil.ReadAll(resp.Body)
-// 	if err != nil {
-// 		log.Fatalf("Failed to read the response body: %v", err)
-// 	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("Failed to read the response body: %v", err)
+	}
 
-// 	var result map[string]interface{}
-// 	err = json.Unmarshal(body, &result)
-// 	if err != nil {
-// 		log.Fatalf("Failed to parse JSON: %v", err)
-// 	}
+	var result map[string]interface{}
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		log.Fatalf("Failed to parse JSON: %v", err)
+	}
 
-// 	data, ok := result["data"].([]interface{})
-// 	if !ok {
-// 		log.Fatalf("Failed to cast data to []interface{}")
-// 	}
+	data, ok := result["data"].([]interface{})
+	if !ok {
+		log.Fatalf("Failed to cast data to []interface{}")
+	}
 
-// 	return []float64{data[0].(float64), data[1].(float64)}
-// }
+	return []float64{data[0].(float64), data[1].(float64)}
+}
 
 func getCarSelfLocation(ctx context.Context) []float64 {
 	url := "http://localhost:" + PERCEPTION_SERVICE_PORT + "/perception/getSelfLocation"
@@ -144,6 +144,7 @@ func RunPerceptionService(cli *clientv3.Client, ctx context.Context, carName str
 		txn := cli.Txn(ctx)
 		currCar := car.GetCarEtcd(cli, ctx, carName)
 		currCar.Dynamics.Location = getCarSelfLocation(ctx)
+		currCar.Dynamics.Speed = getCarSelfSpeed(ctx)
 		currCar.PutEtcd(cli, ctx, "")
 		txn.Commit()
 

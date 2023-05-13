@@ -47,3 +47,12 @@ func (b *Block) ApplyNewLease(lease Lease, currentTime int) error {
 	b.addNewLease(lease)
 	return nil
 }
+
+func (b *Block) GetCarLease(carName string) *Lease {
+	for _, lease := range b.Spec.Leases {
+		if lease.GetCarName() == carName {
+			return &lease
+		}
+	}
+	return nil
+}

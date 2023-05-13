@@ -87,7 +87,7 @@ func (c *Car) IsCarAtDestination(allowedError float64) bool {
  * to one dimension. We need this function to determine whether the assigned destinations
  * are ahead of the car or not. If not, we do not run the lease algorithm.
  */
-func (c *Car) IsDestinationAhead() bool {
+func (c *Car) IsDestinationAhead(heading []float64) bool {
 	currLocation := c.GetLocation()
 	destination := c.GetDestination()
 
@@ -97,7 +97,7 @@ func (c *Car) IsDestinationAhead() bool {
 	}
 
 	diff := []float64{destination[0] - currLocation[0], destination[1] - currLocation[1]}
-	if diff[0] < 0 || diff[1] < 0 {
+	if diff[0]*heading[0] < 0 || diff[1]*heading[1] < 0 {
 		return false
 	}
 	return true

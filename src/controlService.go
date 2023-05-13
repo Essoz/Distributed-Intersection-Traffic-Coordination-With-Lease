@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"time"
@@ -19,6 +21,8 @@ const (
 	RECOMMENDED_SPEED      = 0.3  // in meters per second
 	STOP_SPEED             = 0.0  // in meters per second
 	CHECK_INTERVAL         = 100 * time.Millisecond
+	CAR_DIST_HEAD          = 0.23 // in meters
+	CAR_DIST_TAIL          = 0.19 // in meters
 )
 
 func setCarSelfSpeed(ctx context.Context, speed float64) {
@@ -32,6 +36,33 @@ func setCarSelfSpeed(ctx context.Context, speed float64) {
 	// no need to check data as long as the request is 200
 }
 
+func getCarSelfHeading(ctx context.Context) []float64 {
+	url := "http://localhost:" + CONTROL_SERVICE_PORT + "/control/getSelfHeading"
+	resp, err := http.Get(url)
+	if err != nil {
+		log.Fatalf("Failed to make a request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("Failed to read the response body: %v", err)
+	}
+
+	var result map[string]interface{}
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		log.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	data, ok := result["data"].([]interface{})
+	if !ok {
+		log.Fatalf("Failed to cast data to []interface{}")
+	}
+
+	return []float64{data[0].(float64), data[1].(float64)}
+}
+
 func getCurrBlock(cli *clientv3.Client, ctx context.Context) lease.Block {
 	blocks := lease.GetAllBlocksEtcd(cli, ctx)
 	if len(blocks) != 1 {
@@ -40,20 +71,53 @@ func getCurrBlock(cli *clientv3.Client, ctx context.Context) lease.Block {
 	return blocks[0]
 }
 
-func getDistToBlock(currCar car.Car, currBlock lease.Block) float64 {
+func getDistToBlockStart(currCar car.Car, currBlock lease.Block, heading []float64) float64 {
 	// find the closest boundary to the car
-	var dist float64
-
-	currLoc := currCar.GetLocation()
-	xDiff1 := currLoc[0] - currBlock.Spec.Location[0]
-	xDiff2 := currLoc[0] - currBlock.Spec.Location[0] + currBlock.Spec.Size[0]
-
-	yDiff1 := currLoc[1] - currBlock.Spec.Location[1]
-	yDiff2 := currLoc[1] - currBlock.Spec.Location[1] + currBlock.Spec.Size[1]
-
-	if xDiff1 * xDiff2 < 0 {
-		
+	if heading[0] == 0 && heading[1] == 1 {
+		// heading postive y
+		return currBlock.Spec.Location[1] - currCar.Dynamics.Location[1]
+	} else if heading[0] == 0 && heading[1] == -1 {
+		// heading negative y
+		return currCar.Dynamics.Location[1] - currBlock.Spec.Location[1] - currBlock.Spec.Size[1]
+	} else if heading[0] == 1 && heading[1] == 0 {
+		// heading postive x
+		return currBlock.Spec.Location[0] - currCar.Dynamics.Location[0]
+	} else if heading[0] == -1 && heading[1] == 0 {
+		// heading negative x
+		return currCar.Dynamics.Location[0] - currBlock.Spec.Location[0] - currBlock.Spec.Size[0]
+	} else {
+		panic("Invalid heading at getDistToBlockStart")
+	}
 }
+
+func getDistToBlockEnd(currCar car.Car, currBlock lease.Block, heading []float64) float64 {
+	// find the closest boundary to the car
+	if heading[0] == 0 && heading[1] == 1 {
+		// heading postive y
+		return currBlock.Spec.Location[1] + currBlock.Spec.Size[1] - currCar.Dynamics.Location[1]
+	} else if heading[0] == 0 && heading[1] == -1 {
+		// heading negative y
+		return currCar.Dynamics.Location[1] - currBlock.Spec.Location[1] - currBlock.Spec.Size[1]
+	} else if heading[0] == 1 && heading[1] == 0 {
+		// heading postive x
+		return currBlock.Spec.Location[0] - currCar.Dynamics.Location[0]
+	} else if heading[0] == -1 && heading[1] == 0 {
+		// heading negative x
+		return currCar.Dynamics.Location[0] - currBlock.Spec.Location[0] - currBlock.Spec.Size[0]
+	} else {
+		panic("Invalid heading at getDistToBlockStart")
+	}
+}
+
+func IsCarNearIntersection(currCar car.Car, currBlock lease.Block, heading []float64) bool {
+	dist := getDistToBlockStart(currCar, currBlock, heading)
+	return dist < CAR_DIST_HEAD
+}
+
+// func getCarRecommendedSpeed(currCar car.Car, currBlock lease.Block, heading []float64) float64 {
+// 	dist := getDistToBlockStart(currCar, currBlock, heading)
+
+// }
 
 // Given a car key, it will run the control service for that car
 // Three kinds of actions will happen, depending on the car's state:
@@ -67,12 +131,13 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 
 	currCar := car.GetCarEtcd(cli, ctx, carName)
 	currBlock := getCurrBlock(cli, ctx) // FIXME: we assume there is only one block
+	currCarHeading := getCarSelfHeading(ctx)
 
 	for {
 		currCar = car.GetCarEtcd(cli, ctx, carName)
 
 		for !currCar.IsCarAtDestination(ALLOWED_ERROR_LOCATION) {
-			if !currCar.IsDestinationAhead() {
+			if !currCar.IsDestinationAhead(currCarHeading) {
 				log.Println("destination is behind the car, not running lease control service")
 				setCarSelfSpeed(ctx, -1*RECOMMENDED_SPEED)
 				time.Sleep(CHECK_INTERVAL)
@@ -133,7 +198,30 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 				*/
 			} else if stage == "planning" {
 				log.Println("planning state")
-				setCarSelfSpeed(ctx, RECOMMENDED_SPEED)
+
+				currLease := currBlock.GetCarLease(carName)
+
+				// CONTROL FIRST
+				if currLease == nil {
+					log.Println("no lease found, trying to lease")
+
+					// if not near the intersection, accelerate to the recommended speed
+					if IsCarNearIntersection(currCar, currBlock, currCarHeading) {
+						setCarSelfSpeed(ctx, STOP_SPEED)
+					} else {
+						setCarSelfSpeed(ctx, RECOMMENDED_SPEED)
+					}
+				} else {
+					log.Println("lease found, trying to plan")
+
+					// calculate the recommended speed
+
+				}
+
+				// LEASING
+
+				// if there is no lease, try to lease
+
 			} else {
 				log.Println("unknown state")
 				setCarSelfSpeed(ctx, STOP_SPEED)

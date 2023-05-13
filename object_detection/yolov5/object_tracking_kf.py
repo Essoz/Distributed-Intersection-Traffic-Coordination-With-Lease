@@ -342,7 +342,7 @@ def get_self_dist():
     return dist_tuple
 
 
-def get_heading():
+def get_self_heading():
     return (np.cos(heading), np.sin(heading))
 
 def set_speed(speed):
@@ -1047,6 +1047,10 @@ def run_http_serve():
         speed = flask.request.json['speed']
         set_speed(speed)
         return flask.jsonify({'data': 'success'}), 200
+    
+    @app.route("/perception/getSelfHeading", methods=['GET'])
+    def getSelfHeading():
+        return flask.jsonify({'data': get_self_heading()}), 200
 
     # run the server
     app.run(port=port, host='localhost', debug=True, use_reloader=False)
