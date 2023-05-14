@@ -3,7 +3,6 @@ module github.com/essoz/v2v-backend
 go 1.20
 
 require (
-	github.com/essoz/car-backend v0.0.0-00010101000000-000000000000
 	github.com/google/go-cmp v0.5.9
 	go.etcd.io/etcd/client/v3 v3.5.8
 	gopkg.in/yaml.v3 v3.0.1

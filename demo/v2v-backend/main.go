@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/essoz/v2v-backend/pkg/car"
+	"github.com/essoz/v2v-backend/pkg/lease"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
@@ -92,6 +93,22 @@ func run(cli *clientv3.Client, ctx context.Context) {
 
 		// set car destination
 		SetCarDestination(cli, ctx, requestData.CarName, requestData.Destination)
+	})
+	http.HandleFunc("/block/getAllLeases", func(w http.ResponseWriter, r *http.Request) {
+		// Add CORS headers
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		// getting request for all cars
+		block := lease.GetAllBlocksEtcd(cli, ctx)[0]
+		leases := block.Spec.Leases
+		// marshal leases
+		leasesJson, err := json.Marshal(leases)
+		if err != nil {
+			log.Fatalf("Failed to marshal leases: %v", err)
+		}
+		// leasesJson is a json document
+		w.Write(leasesJson)
 	})
 
 	print("Starting server on port 11002")

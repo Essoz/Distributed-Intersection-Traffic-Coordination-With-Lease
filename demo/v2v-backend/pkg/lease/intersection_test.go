@@ -4,9 +4,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/essoz/v2v-backend/pkg/lease"
 	"github.com/google/go-cmp/cmp"
-
-	"github.com/essoz/car-backend/pkg/lease"
 )
 
 func TestMarshalIntersection(t *testing.T) {

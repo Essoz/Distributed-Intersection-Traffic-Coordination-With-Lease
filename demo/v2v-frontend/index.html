@@ -75,7 +75,7 @@
     };
 
     const fetchLeases = async () => {
-      const response = await fetch('http://localhost:11002/car/getLease');
+      const response = await fetch('http://localhost:11002/block/getAllLeases');
       const data = await response.json();
       return data;
     };
