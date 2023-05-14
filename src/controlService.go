@@ -16,16 +16,20 @@ import (
 )
 
 const (
-	CONTROL_SERVICE_PORT   = "11001"
-	ALLOWED_ERROR_LOCATION = 0.05 // in meters
-	RECOMMENDED_SPEED      = 0.3  // in meters per second
-	STOP_SPEED             = 0.0  // in meters per second
-	CHECK_INTERVAL         = 100 * time.Millisecond
-	CAR_DIST_HEAD          = 0.23 // in meters
-	CAR_DIST_TAIL          = 0.19 // in meters
-	ALLOWED_ERROR_TIME_EXTENDING = 100 // in milliseconds
-	LEASE_EXTEND_DURATION = 500 // in milliseconds
+	CONTROL_SERVICE_PORT         = "11001"
+	ALLOWED_ERROR_LOCATION       = 0.05 // in meters
+	RECOMMENDED_SPEED            = 0.3  // in meters per second
+	STOP_SPEED                   = 0.0  // in meters per second
+	CHECK_INTERVAL               = 100 * time.Millisecond
+	CAR_DIST_HEAD                = 0.23 // in meters
+	CAR_DIST_TAIL                = 0.19 // in meters
+	ALLOWED_ERROR_TIME_EXTENDING = 100  // in milliseconds
+	LEASE_EXTEND_DURATION        = 500  // in milliseconds
 )
+
+func getCurrTimeMilli() int {
+	return int(time.Now().UnixMilli())
+}
 
 func setCarSelfSpeed(ctx context.Context, speed float64) {
 	url := "http://localhost:" + CONTROL_SERVICE_PORT + "/control/setSelfSpeed"
@@ -99,13 +103,13 @@ func getDistToBlockEnd(currCar car.Car, currBlock lease.Block, heading []float64
 		return currBlock.Spec.Location[1] + currBlock.Spec.Size[1] - currCar.Dynamics.Location[1]
 	} else if heading[0] == 0 && heading[1] == -1 {
 		// heading negative y
-		return currCar.Dynamics.Location[1] - currBlock.Spec.Location[1] - currBlock.Spec.Size[1]
+		return currCar.Dynamics.Location[1] - currBlock.Spec.Location[1]
 	} else if heading[0] == 1 && heading[1] == 0 {
 		// heading postive x
-		return currBlock.Spec.Location[0] - currCar.Dynamics.Location[0]
+		return currBlock.Spec.Location[0] + currBlock.Spec.Size[0] - currCar.Dynamics.Location[0]
 	} else if heading[0] == -1 && heading[1] == 0 {
 		// heading negative x
-		return currCar.Dynamics.Location[0] - currBlock.Spec.Location[0] - currBlock.Spec.Size[0]
+		return currCar.Dynamics.Location[0] - currBlock.Spec.Location[0]
 	} else {
 		panic("Invalid heading at getDistToBlockStart")
 	}
@@ -116,10 +120,40 @@ func IsCarNearIntersection(currCar car.Car, currBlock lease.Block, heading []flo
 	return dist < CAR_DIST_HEAD
 }
 
-// func getCarRecommendedSpeed(currCar car.Car, currBlock lease.Block, heading []float64) float64 {
-// 	dist := getDistToBlockStart(currCar, currBlock, heading)
+func getCarRecommendedSpeed(currCar car.Car, currBlock lease.Block, heading []float64) float64 {
+	distMin := getDistToBlockStart(currCar, currBlock, heading)
+	distMax := getDistToBlockEnd(currCar, currBlock, heading)
 
-// }
+	currTimeMilli := getCurrTimeMilli()
+	currLease := currBlock.GetCarLease(currCar.Metadata.Name)
+	if currLease == nil {
+		// recommend a random speed
+		return RECOMMENDED_SPEED
+	}
+
+	if currLease.EndTime < currTimeMilli {
+		log.Fatal("The lease should not be expired")
+	}
+
+	// speed's lower bound is distMax / (leaseEndTime - currTime)
+	// speed's upper bound is distMin / (leaseEndTime - currTime)
+	// speed's recommended value is (distMin + distMax) / 2 / (leaseEndTime - currTime)
+
+	currTimeSeconds := float64(currTimeMilli) / 1000
+	leaseEndTimeSeconds := float64(currLease.EndTime) / 1000
+	speedLowerBound := distMax / (leaseEndTimeSeconds - currTimeSeconds)
+	speedUpperBound := distMin / (leaseEndTimeSeconds - currTimeSeconds)
+	if speedLowerBound > speedUpperBound {
+		log.Fatal("Speed's lower bound should not be greater than speed's upper bound")
+		// TODO: the car cannot make it to the intersection, what should we do?
+	}
+
+	if RECOMMENDED_SPEED >= speedLowerBound && RECOMMENDED_SPEED <= speedUpperBound {
+		return RECOMMENDED_SPEED
+	}
+
+	return (speedLowerBound + speedUpperBound) / 2
+}
 
 // Given a car key, it will run the control service for that car
 // Three kinds of actions will happen, depending on the car's state:
@@ -185,7 +219,7 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 				// LEASING
 				// TODO: check if there's a need to extend the lease
 				/*
-					time := getCurrTime()
+					time := getCurrTimeMilli()
 					currBlock = getBlock()
 					if time > currBlock.LeaseEndTime + allowedErrorRange {
 						// extend the lease
@@ -200,15 +234,15 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 				*/
 
 				// get current time in seconds
-				currTime := int(time.Now().UnixNano() / int64(time.Millisecond))
+				currTimeMilli := getCurrTimeMilli()
 
 				currBlock := getCurrBlock(cli, ctx)
 				recentPastLease := currBlock.GetCarLease(carName)
-				if currTime > recentPastLease.EndTime + ALLOWED_ERROR_TIME_EXTENDING {
+				if currTimeMilli > recentPastLease.EndTime+ALLOWED_ERROR_TIME_EXTENDING {
 					// extend the lease of the car itself (end only)
 					currentEndTime := currBlock.GetCarLease(carName).EndTime
-					currBlock.GetCarLease(carName).EndTime = currTime + LEASE_EXTEND_DURATION
-					// extend the upcoming leases (start and end)	
+					currBlock.GetCarLease(carName).EndTime = currTimeMilli + LEASE_EXTEND_DURATION
+					// extend the upcoming leases (start and end)
 					currBlock.ExtendUpcomingLease(currentEndTime, LEASE_EXTEND_DURATION)
 				}
 				currBlock.PutEtcd(cli, ctx, "")
@@ -230,14 +264,23 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 					}
 				} else {
 					log.Println("lease found, trying to plan")
-
 					// calculate the recommended speed
-
+					setCarSelfSpeed(ctx, getCarRecommendedSpeed(currCar, currBlock, currCarHeading))
 				}
 
 				// LEASING
+				if currLease == nil {
+					// if there's no lease, try to make leases
+					// given the current speed, predict the time when the car will reach the intersection
+					// predStartTime, predEndTime
+					// make the lease at the first available time
+				} else {
+					// there is a lease
 
-				// if there is no lease, try to lease
+					// check do we need to bring the lease forward (check this if the recommended speed is greater than the current speed)
+
+					// check if we can make it to the intersection, if not, cancel the lease
+				}
 
 			} else {
 				log.Println("unknown state")
