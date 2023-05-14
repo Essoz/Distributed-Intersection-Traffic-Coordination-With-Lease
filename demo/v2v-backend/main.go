@@ -13,26 +13,6 @@ import (
 
 func GetAllCars(cli *clientv3.Client, ctx context.Context) ([]byte, error) {
 	cars := car.GetAllCarsWithKeyEtcd(cli, ctx, "")
-
-	// // for test purposes only
-	// car_1 := car.Car{
-	// 	Metadata: car.CarMetadata{
-	// 		Name: "car_1",
-	// 	},
-	// 	Dynamics: car.CarDynamics{
-	// 		Location: []float64{10.0, 20.0},
-	// 	},
-	// }
-	// car_2 := car.Car{
-	// 	Metadata: car.CarMetadata{
-	// 		Name: "car_2",
-	// 	},
-	// 	Dynamics: car.CarDynamics{
-	// 		Location: []float64{30.0, 40.0},
-	// 	},
-	// }
-	// cars := []car.Car{car_1, car_2}
-
 	return json.Marshal(cars)
 }
 
