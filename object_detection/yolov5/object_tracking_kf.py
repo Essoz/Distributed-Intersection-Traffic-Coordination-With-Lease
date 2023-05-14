@@ -10,6 +10,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
+import json
 
 import cv2
 import numpy as np
@@ -329,6 +330,7 @@ def get_cars_dict():
         cars_absolute_dict_y = x_qcar_cood * np.sin(heading) + y_qcar_cood * np.cos(heading) + current_dist * np.sin(heading) + start_tuples[start_pos][1]
         cars_absolute_dict[car]['location'] = (cars_absolute_dict_x, cars_absolute_dict_y)
 
+    print("CARS ABS DICT: ", json.dumps(cars_absolute_dict, indent=4))
     return cars_absolute_dict
     # return cars_dict
     
@@ -343,7 +345,7 @@ def get_self_dist():
 
 
 def get_self_heading():
-    return (np.cos(heading), np.sin(heading))
+    return [int(np.cos(heading)), int(np.sin(heading))]
 
 def set_speed(speed):
     global desired_speed
@@ -372,6 +374,12 @@ def match_cars(cars_position, timeDetect):
         else:
             cars_dict[num_cars] = {"speed": (0, 0), "location": car_1, "time": timeDetect}
             num_cars += 1
+    if not cars_position:
+        if cars_dict:
+            cars_dict_keys = list(cars_dict.keys())
+            for car in cars_dict_keys:
+                if timeDetect - cars_dict[car]["time"] > 0.5:
+                    del(cars_dict[car])
 
 
 def camera_receiver(imgsz=640,  # inference size (pixels)
@@ -964,6 +972,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
 
     lidarThread.join()
     cameraThread.join()
+    QcarThread.join()
     # np.save('kf/measure_0_record.npy', measure_0_record)
     # np.save('kf/measure_1_record.npy', measure_1_record)
     # np.save('kf/kf_0_record.npy', kf_0_record)

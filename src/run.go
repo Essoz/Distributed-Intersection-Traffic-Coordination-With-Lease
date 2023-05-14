@@ -72,7 +72,7 @@ func initializeIntersectionAndBlock(cli *clientv3.Client, ctx context.Context, p
 
 func Run(cli *clientv3.Client, ctx context.Context) {
 	// we assume that the car already know which intersection it is at, now it tries to register the intersection into etcd
-	intersectionName := initializeIntersectionAndBlock(cli, ctx, "intersection.yaml")
+	intersectionName := initializeIntersectionAndBlock(cli, ctx, "demo-data/intersection.yaml")
 
 	go RunPerceptionService(cli, ctx, global_car_name)
 	go RunControlService(cli, ctx, global_car_name, intersectionName)

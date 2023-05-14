@@ -111,7 +111,7 @@
     const renderCars = (carData) => {
       mapElement.innerHTML = '';
 
-      // renderLanes();
+      renderLanes();
       carData.forEach((car) => {
         const carElement = document.createElement('div');
         carElement.classList.add('car');
@@ -144,8 +144,6 @@
       carLabel.style.position = 'absolute';
       carLabel.style.left = '8px';
       carLabel.style.top = '-2px';
-
-
     };
 
     const renderleases = (leaseData) => {
@@ -208,6 +206,9 @@
     <input id="input_car_x" type="number" placeholder="X">
     <input id="input_car_y" type="number" placeholder="Y">
 
+    <button id="button_start_exp">Start Experiment</button>
+    <button id="button_stop_exp">Reset Experiment</button>
+
   </div>
   <script>
     document.getElementById('button_clear_all_destination').addEventListener('click', async () => {
@@ -244,12 +245,7 @@
       const responseData = await response.text();
     })
 
-    document.getElementById('button_set_car_destination').addEventListener('click', async () => {
-      console.log('Button Set Car Destination clicked');
-      const carName = document.getElementById('input_car_name').value;
-      const carX = parseFloat(document.getElementById('input_car_x').value);
-      const carY = parseFloat(document.getElementById('input_car_y').value);
-
+    const set_car_destination = async (carName, carX, carY) => {
       const data = {
         carName: carName,
         destination: [carX, carY],
@@ -263,6 +259,30 @@
 
       const response = await fetch('http://localhost:11002/car/setDestination', requestOptions);
       const responseData = await response.text();
+    }
+
+    document.getElementById('button_set_car_destination').addEventListener('click', async () => {
+      console.log('Button Set Car Destination clicked');
+      const carName = document.getElementById('input_car_name').value;
+      const carX = parseFloat(document.getElementById('input_car_x').value);
+      const carY = parseFloat(document.getElementById('input_car_y').value);
+      set_car_destination(carName, carX, carY);
+    })
+
+    document.getElementById("button_start_exp").addEventListener('click', async () => {
+      console.log("Button Start Experiment clicked")
+      const promise1 = set_car_destination("192.168.2.12", 3.2, 1.8)
+      const promose2 = set_car_destination("192.168.2.13", 1.4, 0)
+
+      await Promise.all([promise1, promose2])
+    })
+
+    document.getElementById("button_stop_exp").addEventListener('click', async () => {
+      console.log("Button Stop Experiment clicked")
+      set_car_destination("192.168.2.12", 0, 1.8)
+      // sleep for 5 seconds to avoid collision
+      await new Promise(r => setTimeout(r, 5000));
+      set_car_destination("192.168.2.13", 1.4, 3.2)
     })
   </script>
 

@@ -2,6 +2,7 @@ package car
 
 import (
 	"context"
+	"log"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"gopkg.in/yaml.v3"
@@ -16,6 +17,10 @@ func GetCarEtcd(cli *clientv3.Client, ctx context.Context, carName string) Car {
 	}
 
 	var car Car
+	if len(resp.Kvs) == 0 {
+		return Car{}
+	}
+
 	err = yaml.Unmarshal(resp.Kvs[0].Value, &car)
 	if err != nil {
 		panic(err)
@@ -90,8 +95,14 @@ func (c *Car) UpdateSurroundingCarsEtcd(cli *clientv3.Client, ctx context.Contex
 	prefix := c.Metadata.Name + "/surrounding/"
 
 	prevSurrCars := c.GetSurroundingCarsEtcd(cli, ctx)
+
+	for _, currSurrCar := range surroundingCars {
+		log.Printf("currSurrCar: %s", currSurrCar.GetName())
+	}
+
 	// delete the cars that are not in the new list but in the old list
 	for _, prevSurrCar := range prevSurrCars {
+		log.Printf("prevSurrCar: %s", prevSurrCar.GetName())
 		// if the car's name is not in the new list, delete it
 		name := prevSurrCar.Metadata.Name
 		found := false

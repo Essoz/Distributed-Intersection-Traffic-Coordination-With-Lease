@@ -7,6 +7,12 @@ user_name="nvidia"
 # 1. build the service go binary
 cd src; zsh build_for_car.sh; cd ..
 
+ssh $user_name@$car_ip_1 "mkdir -p demo-data"
+ssh $user_name@$car_ip_2 "mkdir -p demo-data"
+
+scp data/intersection.yaml $user_name@$car_ip_1:/home/$user_name/demo-data
+scp data/intersection.yaml $user_name@$car_ip_2:/home/$user_name/demo-data
+
 # 1.5. scp the start-service script
 scp start-service-local.sh $user_name@$car_ip_1:/home/$user_name
 scp start-service-local.sh $user_name@$car_ip_2:/home/$user_name

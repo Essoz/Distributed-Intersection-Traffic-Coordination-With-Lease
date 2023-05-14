@@ -18,6 +18,7 @@ func (b *Block) GetLeases() []Lease {
 func (b *Block) CleanPastLeases(currentTimeMilli int) {
 	for i, lease := range b.GetLeases() {
 		if lease.EndTime < currentTimeMilli {
+			log.Printf("Deleting lease %#v because of expiration", lease)
 			b.Spec.Leases = append(b.GetLeases()[:i], b.GetLeases()[i+1:]...)
 		}
 	}
@@ -121,6 +122,7 @@ func (b *Block) GetLastEndTime() int {
 func (b *Block) CleanCarLeases(carName string) {
 	for i, lease := range b.Spec.Leases {
 		if lease.CarName == carName {
+			log.Printf("Deleting lease %#v for car %s", lease, carName)
 			b.Spec.Leases = append(b.GetLeases()[:i], b.GetLeases()[i+1:]...)
 		}
 	}
