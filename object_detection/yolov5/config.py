@@ -17,7 +17,7 @@ if hostname.strip() == 'qcar-50577':
     wheel_offset = -0.0605
 else: 
     camera_offset = [-2.144, 0, -3.215, 0]
-    wheel_offset = -0.055
+    wheel_offset = -0.054
 
 dist_to_head = 0.23
 dist_to_tail = 0.19

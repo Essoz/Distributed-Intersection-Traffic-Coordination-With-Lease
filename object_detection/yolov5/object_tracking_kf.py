@@ -277,7 +277,9 @@ def process_pred(pred, map):
     for car_1 in cars_angle:
         if car_1[3] is not None:
             for car_2 in cars_angle:
+                car_matched = False
                 if car_2[3] is not None and car_2[3] == car_1[2] and car_2[2] == car_1[3]:
+                    car_matched = True
                     if car_1[2] < car_2[2]:
                         if car_1[2] != 0 or car_2[2] != 3:
                             new_cars_angle.append((car_1[0], car_2[1], car_1[2], car_2[2]))
@@ -292,6 +294,8 @@ def process_pred(pred, map):
                         else:
                             new_cars_angle.append((car_1[0]+2*np.pi, car_2[1], car_1[2], car_2[2]))
                             break
+            if not car_matched:
+                new_cars_angle.append((car_1[0], car_1[1], car_1[2], None))
         else:
             new_cars_angle.append(car_1)
 
@@ -346,34 +350,19 @@ def process_pred(pred, map):
     return cars
 
 
+"""
+Schema of cars_dict:
+{
+    "location": position of cars at given time
+    "speed": velocity calculated by diff of "pos"
+    "time": time detecting these data
+}
+"""
 num_cars = 0
 cars_dict = {}
-def get_cars_dict():
-    """
-    Schema of cars_dict:
-    {
-        "location": position of cars at given time
-        "speed": velocity calculated by diff of "pos"
-        "time": time detecting these data
-    }
-    """
-    num = len(cars_dict.keys())
-    cars_absolute_dict = {i: cars_dict[i].copy() for i in cars_dict}
-    for car in cars_dict:
-        x_speed_qcar_cood = cars_absolute_dict[car]['speed'][0]
-        y_speed_qcar_cood = cars_absolute_dict[car]['speed'][1]
-        x_qcar_cood = cars_absolute_dict[car]['location'][0]
-        y_qcar_cood = cars_absolute_dict[car]['location'][1]
-        cars_absolute_dict_x_speed = x_speed_qcar_cood * np.cos(heading) - y_speed_qcar_cood * np.sin(heading) + current_speed * np.cos(heading)
-        cars_absolute_dict_y_speed = x_speed_qcar_cood * np.sin(heading) + y_speed_qcar_cood * np.cos(heading) + current_speed * np.sin(heading)
-        cars_absolute_dict[car]['speed'] = (cars_absolute_dict_x_speed, cars_absolute_dict_y_speed)
-        cars_absolute_dict_x = x_qcar_cood * np.cos(heading) - y_qcar_cood * np.sin(heading) + current_dist * np.cos(heading) + start_tuples[start_pos][0]
-        cars_absolute_dict_y = x_qcar_cood * np.sin(heading) + y_qcar_cood * np.cos(heading) + current_dist * np.sin(heading) + start_tuples[start_pos][1]
-        cars_absolute_dict[car]['location'] = (cars_absolute_dict_x, cars_absolute_dict_y)
 
-    print("CARS ABS DICT: ", json.dumps(cars_absolute_dict, indent=4))
-    return cars_absolute_dict
-    # return cars_dict
+def get_cars_dict():
+    return cars_dict
     
 
 def get_self_speed():
@@ -388,39 +377,44 @@ def get_self_dist():
 def get_self_heading():
     return [int(np.cos(heading)), int(np.sin(heading))]
 
+
 def set_speed(speed):
     global desired_speed
     desired_speed = speed
     return
 
 
-def match_cars(cars_position, timeDetect):
+def match_cars(cars_position, speed, dist, timeDetect):
     global num_cars
     for car_1 in cars_position:
-        if cars_dict:
-            appended = False
-            cars_dict_keys = list(cars_dict.keys())
-            for car_2 in cars_dict_keys:
-                possible_pos = (cars_dict[car_2]["speed"][0]*(timeDetect - cars_dict[car_2]["time"]) + cars_dict[car_2]["location"][0], cars_dict[car_2]["speed"][1]*(timeDetect - cars_dict[car_2]["time"]) + cars_dict[car_2]["location"][1])
-                if (possible_pos[0]-car_1[0])**2 + (possible_pos[1]-car_1[1])**2 < 0.2**2 and not appended:
-                    cars_dict[car_2]["speed"] = (0.6 * (car_1[0]-cars_dict[car_2]["location"][0]) / (timeDetect - cars_dict[car_2]["time"]) + 0.4 * cars_dict[car_2]["speed"][0], 0.6 * (car_1[1]-cars_dict[car_2]["location"][1]) / (timeDetect - cars_dict[car_2]["time"]) + 0.4 * cars_dict[car_2]["speed"][1])
-                    cars_dict[car_2]["location"] = car_1
-                    cars_dict[car_2]["time"] = timeDetect
-                    appended = True
-                elif timeDetect - cars_dict[car_2]["time"] > 0.5:
-                    del(cars_dict[car_2])
-            if not appended:
-                cars_dict[num_cars] = {"speed": (0, 0), "location": car_1, "time": timeDetect}
-                num_cars += 1
-        else:
-            cars_dict[num_cars] = {"speed": (0, 0), "location": car_1, "time": timeDetect}
+        appended = False
+        x_location = car_1[0]
+        y_location = car_1[1]
+        x_location_abs = x_location * np.cos(heading) - y_location * np.sin(heading) + dist * np.cos(heading) + start_tuples[start_pos][0]
+        y_location_abs = x_location * np.sin(heading) + y_location * np.cos(heading) + dist * np.sin(heading) + start_tuples[start_pos][1]
+
+        for car_2 in cars_dict:
+            possible_pos = (cars_dict[car_2]["speed"][0]*(timeDetect - cars_dict[car_2]["time"]) + cars_dict[car_2]["location"][0], cars_dict[car_2]["speed"][1]*(timeDetect - cars_dict[car_2]["time"]) + cars_dict[car_2]["location"][1])
+            if (possible_pos[0] - x_location_abs)**2 + (possible_pos[1] - y_location_abs)**2 < 0.2**2 and not appended:
+                x_speed = 0.7 * (x_location_abs - cars_dict[car_2]["location"][0]) / (timeDetect - cars_dict[car_2]["time"]) + 0.3 * cars_dict[car_2]["speed"][0]
+                y_speed = 0.7 * (y_location_abs - cars_dict[car_2]["location"][1]) / (timeDetect - cars_dict[car_2]["time"]) + 0.3 * cars_dict[car_2]["speed"][1]
+                x_speed_abs = x_speed * np.cos(heading) - y_speed * np.sin(heading) + speed * np.cos(heading)
+                y_speed_abs = x_speed * np.sin(heading) + y_speed * np.cos(heading) + speed * np.sin(heading)
+
+                cars_dict[car_2]["speed"] = (x_speed_abs, y_speed_abs)
+                cars_dict[car_2]["location"] = (x_location_abs, y_location_abs)
+                cars_dict[car_2]["time"] = timeDetect
+                appended = True
+                break
+
+        if not appended:
+            cars_dict[num_cars] = {"speed": (0, 0), "location": (x_location_abs, y_location_abs), "time": timeDetect}
             num_cars += 1
-    if not cars_position:
-        if cars_dict:
-            cars_dict_keys = list(cars_dict.keys())
-            for car in cars_dict_keys:
-                if timeDetect - cars_dict[car]["time"] > 0.5:
-                    del(cars_dict[car])
+    if cars_dict:
+        cars_dict_keys = list(cars_dict.keys())
+        for car in cars_dict_keys:
+            if timeDetect - cars_dict[car]["time"] > 0.5:
+                del(cars_dict[car])
 
 
 def camera_receiver(imgsz=640,  # inference size (pixels)
@@ -803,12 +797,18 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
     try:
         while elapsed_time() < simulationTime:
             start = time.time()
-
             # t1 = time_sync()
+
+            # copy speed, dist
+            speed_copy = current_speed
+            dist_copy = current_dist
+
+            # copy LIDAR map
             mutex_map.acquire()
             map_copy = map.copy()
             mutex_map.release()
 
+            # copy camera image
             if onnx:
                 mutex_img.acquire()
                 img = img_transform.astype('float32')
@@ -912,7 +912,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                 #     time_record.append(time.time() - startTime)
                 
                 # match cars
-                match_cars(cars_position, start)
+                match_cars(cars_position, speed_copy, dist_copy, start)
                 # match_cars([kf_position], start)
                 # print("cars_dict:", cars_dict)
                 # print("cars_abs_dict:", get_cars_dict())
