@@ -3,6 +3,8 @@ package lease
 import (
 	"errors"
 	"log"
+	"sort"
+	"strings"
 )
 
 // get block name
@@ -18,7 +20,7 @@ func (b *Block) GetLeases() []Lease {
 func (b *Block) CleanPastLeases(currentTimeMilli int) {
 	for i, lease := range b.GetLeases() {
 		if lease.EndTime < currentTimeMilli {
-			log.Printf("Deleting lease %#v because of expiration", lease)
+			log.Printf("[CLEAN PAST LEASES] CurrentTime: %d, Deleting lease %#v because of expiration", currentTimeMilli, lease)
 			b.Spec.Leases = append(b.GetLeases()[:i], b.GetLeases()[i+1:]...)
 		}
 	}
@@ -59,17 +61,36 @@ func (b *Block) GetCurrentLease(currentTimeMilli int) Lease {
 	return Lease{}
 }
 
-func (b *Block) ExtendUpcomingLease(inputTime int, extendTime int) {
-	for _, lease := range b.Spec.Leases {
-		if lease.StartTime > inputTime {
-			lease.DelayStartTime(lease.StartTime + extendTime)
-			lease.ExtendEndTime(lease.EndTime + extendTime)
+func (b *Block) DelayUpcomingLease(inputTime int) {
+	// first sort the leases according to start time
+	sort.Slice(b.Spec.Leases, func(i, j int) bool {
+		return b.Spec.Leases[i].StartTime < b.Spec.Leases[j].StartTime
+	})
+
+	for idx := range b.Spec.Leases {
+		if b.Spec.Leases[idx].StartTime > inputTime {
+			if idx > 1 && b.Spec.Leases[idx].StartTime < b.Spec.Leases[idx-1].EndTime {
+				// if one of the lease at idx is nonV2V, ignore this one
+				if strings.Contains(b.Spec.Leases[idx].CarName, "/surrounding/") {
+					continue
+				}
+
+				// if the lease is conflicting with the previous lease, then we need to delay it
+				newStartTime := b.Spec.Leases[idx-1].EndTime + 1
+				newEndTime := newStartTime + b.Spec.Leases[idx].GetDuration()
+				b.Spec.Leases[idx].DelayStartTime(newStartTime)
+				b.Spec.Leases[idx].ExtendEndTime(newEndTime)
+			} else {
+				// no more conflict, so we can stop
+				break
+			}
 		}
 	}
 }
 
 func (b *Block) addNewLease(lease Lease) {
 	// check if the lease already exists
+	log.Printf("Added new lease %#v", lease)
 	b.Spec.Leases = append(b.GetLeases(), lease)
 }
 
@@ -79,6 +100,7 @@ func (b *Block) ApplyNewLease(lease Lease) error {
 	pastLease := b.GetCurrentLease(lease.EndTime)
 	if prevLease != (Lease{}) || pastLease != (Lease{}) {
 		// TODO: if the applied lease cannot fit, add constraint solving logic. For now, just return failure
+		log.Printf("Cannot apply new lease %#v as it overlaps with the current lease %#v or past lease %#v", lease, prevLease, pastLease)
 		return errors.New("cannot apply new lease as it overlaps with existing leases")
 	}
 
@@ -87,7 +109,27 @@ func (b *Block) ApplyNewLease(lease Lease) error {
 	return nil
 }
 
+func (b *Block) ApplyNewLeaseNonV2V(lease Lease) error {
+	// if there are conflicting leases, we want to delay all the leases after the new lease
+	b.addNewLease(lease)
+	b.DelayUpcomingLease(lease.EndTime)
+	return nil
+}
+
+func (b *Block) UpdateLeaseNonV2V(newLease Lease) error {
+	// find the lease
+	for i, lease := range b.Spec.Leases {
+		if lease.CarName == newLease.CarName {
+			log.Printf("Updating lease %#v", lease)
+			b.Spec.Leases = append(b.GetLeases()[:i], b.GetLeases()[i+1:]...)
+			return b.ApplyNewLeaseNonV2V(lease)
+		}
+	}
+	return errors.New("cannot find existing lease")
+}
+
 func (b *Block) UpdateLease(lease Lease) error {
+	log.Printf("Updating lease %#v", lease)
 	// find the lease
 	existingLease := b.GetCarLease(lease.CarName)
 	if existingLease == nil {
@@ -125,5 +167,28 @@ func (b *Block) CleanCarLeases(carName string) {
 			log.Printf("Deleting lease %#v for car %s", lease, carName)
 			b.Spec.Leases = append(b.GetLeases()[:i], b.GetLeases()[i+1:]...)
 		}
+	}
+}
+
+func (b *Block) CleanNonExistSurrCarLeases(surrCarNames []string) {
+	toClean := []string{}
+	for _, lease := range b.Spec.Leases {
+		if strings.Contains(lease.CarName, "/surrounding/") {
+			found := false
+			for _, surrCarName := range surrCarNames {
+				if lease.CarName == surrCarName {
+					found = true
+					break
+				}
+			}
+			if !found {
+				log.Printf("Deleting lease %#v for car %s because it's not being observed anymore", lease, lease.CarName)
+				toClean = append(toClean, lease.CarName)
+			}
+		}
+	}
+
+	for _, carName := range toClean {
+		b.CleanCarLeases(carName)
 	}
 }

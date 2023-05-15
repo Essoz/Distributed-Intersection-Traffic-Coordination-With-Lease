@@ -16,4 +16,4 @@ tmux new-window -t $session -n 'tracking-service'
 tmux send-keys -t $session:tracking-service 'cd ./object_detection/yolov5/; bash object_tracking_kf.sh' C-m
 
 tmux new-window -t $session -n 'service'
-tmux send-keys -t $session:service './service_arm64' C-m
+tmux send-keys -t $session:service './service_arm64 > run.log' C-m

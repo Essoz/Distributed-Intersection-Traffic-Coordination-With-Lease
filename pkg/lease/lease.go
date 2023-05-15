@@ -32,8 +32,8 @@ func (lease *Lease) OverlapsWith(other Lease) bool {
 	return !(lease.EndTime < other.StartTime || lease.StartTime > other.EndTime)
 }
 
-func (lease *Lease) DelayStartTime(newEndTime int) {
-	lease.StartTime = newEndTime
+func (lease *Lease) DelayStartTime(newStartTime int) {
+	lease.StartTime = newStartTime
 }
 
 func (lease *Lease) ExtendEndTime(newEndTime int) {

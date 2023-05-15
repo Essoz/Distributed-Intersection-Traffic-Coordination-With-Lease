@@ -14,10 +14,10 @@ pix2angle = 0.183988
 # parameters for car 192.168.2.12
 if hostname.strip() == 'qcar-50577':
     camera_offset = [-1.931, 1.548, 1.931, 4.235]
-    wheel_offset = -0.066
+    wheel_offset = -0.0605
 else: 
     camera_offset = [-2.144, 0, -3.215, 0]
-    wheel_offset = -0.041
+    wheel_offset = -0.055
 
 dist_to_head = 0.23
 dist_to_tail = 0.19

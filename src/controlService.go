@@ -114,73 +114,86 @@ func getDistToBlockEnd(currCar car.Car, currBlock lease.Block, heading []float64
 		// heading negative x
 		return currCar.Dynamics.Location[0] - currBlock.Spec.Location[0]
 	} else {
-		panic("Invalid heading at getDistToBlockStart")
+		panic("Invalid heading at getDistToBlockEnd")
 	}
 }
 
 func getCarStage(currCar car.Car, currBlock lease.Block, heading []float64) string {
-	var closestBoundary float64
-	var farthestBoundary float64
+	closestDist := getDistToBlockStart(currCar, currBlock, heading) - CAR_DIST_HEAD
+	farthestDist := getDistToBlockEnd(currCar, currBlock, heading) + CAR_DIST_TAIL
 
-	currLoc := currCar.GetLocation()
-	if heading[0] == 0 && heading[1] == 1 {
-		// heading postive y
-		closestBoundary = currBlock.Spec.Location[1]
-		farthestBoundary = currBlock.Spec.Location[1] + currBlock.Spec.Size[1]
-		if currLoc[1] < closestBoundary {
-			return "planning"
-		} else if currLoc[1] < farthestBoundary {
-			return "crossing"
-		} else {
-			return "post-crossing"
-		}
-	} else if heading[0] == 0 && heading[1] == -1 {
-		// heading negative y
-		closestBoundary = currBlock.Spec.Location[1] + currBlock.Spec.Size[1]
-		farthestBoundary = currBlock.Spec.Location[1]
-		if currLoc[1] > closestBoundary {
-			return "planning"
-		} else if currLoc[1] > farthestBoundary {
-			return "crossing"
-		} else {
-			return "post-crossing"
-		}
-	} else if heading[0] == 1 && heading[1] == 0 {
-		// heading postive x
-		closestBoundary = currBlock.Spec.Location[0]
-		farthestBoundary = currBlock.Spec.Location[0] + currBlock.Spec.Size[0]
-		if currLoc[0] < closestBoundary {
-			return "planning"
-		} else if currLoc[0] < farthestBoundary {
-			return "crossing"
-		} else {
-			return "post-crossing"
-		}
-	} else if heading[0] == -1 && heading[1] == 0 {
-		// heading negative x
-		closestBoundary = currBlock.Spec.Location[0] + currBlock.Spec.Size[0]
-		farthestBoundary = currBlock.Spec.Location[0]
-		if currLoc[0] > closestBoundary {
-			return "planning"
-		} else if currLoc[0] > farthestBoundary {
-			return "crossing"
-		} else {
-			return "post-crossing"
-		}
+	if closestDist > 0 {
+		return "planning"
+	} else if farthestDist > 0 {
+		return "crossing"
+	} else {
+		return "post-crossing"
 	}
 
-	log.Printf("Heading is %v", heading)
-	panic("Invalid heading at getCarStage")
+	// var closestBoundary float64
+	// var farthestBoundary float64
+
+	// currLoc := currCar.GetLocation()
+	// if heading[0] == 0 && heading[1] == 1 {
+	// 	// heading postive y
+	// 	closestBoundary = currBlock.Spec.Location[1] - CAR_DIST_HEAD
+	// 	farthestBoundary = currBlock.Spec.Location[1] + currBlock.Spec.Size[1] + CAR_DIST_TAIL
+	// 	if currLoc[1] < closestBoundary {
+	// 		return "planning"
+	// 	} else if currLoc[1] < farthestBoundary {
+	// 		return "crossing"
+	// 	} else {
+	// 		return "post-crossing"
+	// 	}
+	// } else if heading[0] == 0 && heading[1] == -1 {
+	// 	// heading negative y
+	// 	closestBoundary = currBlock.Spec.Location[1] + currBlock.Spec.Size[1] - CAR_DIST_HEAD
+	// 	farthestBoundary = currBlock.Spec.Location[1] + CAR_DIST_TAIL
+	// 	if currLoc[1] > closestBoundary {
+	// 		return "planning"
+	// 	} else if currLoc[1] > farthestBoundary {
+	// 		return "crossing"
+	// 	} else {
+	// 		return "post-crossing"
+	// 	}
+	// } else if heading[0] == 1 && heading[1] == 0 {
+	// 	// heading postive x
+	// 	closestBoundary = currBlock.Spec.Location[0] - CAR_DIST_HEAD
+	// 	farthestBoundary = currBlock.Spec.Location[0] + currBlock.Spec.Size[0] + CAR_DIST_TAIL
+	// 	if currLoc[0] < closestBoundary {
+	// 		return "planning"
+	// 	} else if currLoc[0] < farthestBoundary {
+	// 		return "crossing"
+	// 	} else {
+	// 		return "post-crossing"
+	// 	}
+	// } else if heading[0] == -1 && heading[1] == 0 {
+	// 	// heading negative x
+	// 	closestBoundary = currBlock.Spec.Location[0] + currBlock.Spec.Size[0] - CAR_DIST_HEAD
+	// 	farthestBoundary = currBlock.Spec.Location[0] + CAR_DIST_TAIL
+	// 	if currLoc[0] > closestBoundary {
+	// 		return "planning"
+	// 	} else if currLoc[0] > farthestBoundary {
+	// 		return "crossing"
+	// 	} else {
+	// 		return "post-crossing"
+	// 	}
+	// }
+
+	// log.Printf("Heading is %v", heading)
+	// panic("Invalid heading at getCarStage")
 }
 
 func IsCarNearIntersection(currCar car.Car, currBlock lease.Block, heading []float64) bool {
 	dist := getDistToBlockStart(currCar, currBlock, heading)
-	return dist < CAR_DIST_HEAD
+	return dist <= 0
 }
 
 func getCarRecommendedSpeed(currCar car.Car, currBlock lease.Block, heading []float64) float64 {
-	distMin := getDistToBlockStart(currCar, currBlock, heading)
-	distMax := getDistToBlockEnd(currCar, currBlock, heading)
+	distMin := getDistToBlockStart(currCar, currBlock, heading) - CAR_DIST_HEAD
+	distMax := getDistToBlockEnd(currCar, currBlock, heading) + CAR_DIST_TAIL
+
+	crossingIntersectionTimeSeconds := (distMax - distMin) / RECOMMENDED_FORWARD_SPEED
 
 	currTimeMilli := getCurrTimeMilli()
 	currLease := currBlock.GetCarLease(currCar.Metadata.Name)
@@ -200,7 +213,7 @@ func getCarRecommendedSpeed(currCar car.Car, currBlock lease.Block, heading []fl
 	currTimeSeconds := float64(currTimeMilli) / 1000
 	leaseEndTimeSeconds := float64(currLease.EndTime) / 1000
 	leaseStartTimeSeconds := float64(currLease.StartTime) / 1000
-	speedLowerBound := distMax / (leaseEndTimeSeconds - currTimeSeconds)
+	speedLowerBound := distMin / (leaseEndTimeSeconds - currTimeSeconds - crossingIntersectionTimeSeconds)
 	speedUpperBound := distMin / (leaseStartTimeSeconds - currTimeSeconds)
 
 	if speedUpperBound < 0 {
@@ -256,10 +269,15 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 		currCar = car.GetCarEtcd(cli, ctx, carName)
 		for !currCar.IsCarAtDestination(ALLOWED_ERROR_LOCATION) {
 			stage := getCarStage(currCar, currBlock, currCarHeading)
-			log.Printf("CurrentStage: %s\n", stage)
-
+			currBlock = getCurrBlock(cli, ctx)
 			currTimeMilli := getCurrTimeMilli()
+			log.Printf("CurrentStage: %s\n, time %d", stage, currTimeMilli)
+
 			currBlock.CleanPastLeases(currTimeMilli)
+			// print all the leases
+			for _, lease := range currBlock.Spec.Leases {
+				log.Printf("Lease %s: %#v\n", lease.CarName, lease)
+			}
 
 			if !currCar.IsDestinationAhead(currCarHeading) {
 				log.Println("destination is behind the car, not running lease control service")
@@ -290,37 +308,43 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 			*/
 
 			if stage == "post-crossing" {
-				log.Println("post-crossing state")
-
 				// CONTROL
 				setCarSelfSpeed(ctx, RECOMMENDED_FORWARD_SPEED)
 
 				// LEASING
 				currBlock.CleanCarLeases(carName)
+				currBlock.PutEtcd(cli, ctx, "")
 
 			} else if stage == "crossing" {
-				log.Println("crossing state")
-
 				// CONTROL
 				// if there is lease, accelerate to the recommended speed
 				setCarSelfSpeed(ctx, RECOMMENDED_FORWARD_SPEED)
 
 				// LEASING
 				// get current time in milliseconds
-				currBlock := getCurrBlock(cli, ctx)
+				for _, lease := range currBlock.Spec.Leases {
+					log.Printf("[CROSSING] Lease %s: %#v\n", lease.CarName, lease)
+				}
+
 				recentPastLease := currBlock.GetCarLease(carName)
-				if currTimeMilli > recentPastLease.EndTime+ALLOWED_ERROR_TIME_EXTENDING {
+				if currTimeMilli > recentPastLease.EndTime-3*ALLOWED_ERROR_TIME_EXTENDING {
+					log.Printf("Lease is ending, trying to extend the lease")
 					// extend the lease of the car itself (end only)
 					currentEndTime := currBlock.GetCarLease(carName).EndTime
-					currBlock.GetCarLease(carName).EndTime = currTimeMilli + LEASE_EXTEND_DURATION
+					log.Printf("Previous lease end time is %d", currentEndTime)
+					for idx := range currBlock.Spec.Leases {
+						if currBlock.Spec.Leases[idx].CarName == carName {
+							currBlock.Spec.Leases[idx].EndTime = currentEndTime + LEASE_EXTEND_DURATION*2
+						}
+					}
+
 					// extend the upcoming leases (start and end)
-					currBlock.ExtendUpcomingLease(currentEndTime, LEASE_EXTEND_DURATION)
+					currBlock.DelayUpcomingLease(currBlock.GetCarLease(carName).EndTime)
+					log.Printf("New lease end time is %d", currBlock.GetCarLease(carName).EndTime)
 				}
 				currBlock.PutEtcd(cli, ctx, "")
 
 			} else if stage == "planning" {
-				log.Println("planning state")
-
 				currLease := currBlock.GetCarLease(carName)
 
 				// CONTROL FIRST
@@ -329,6 +353,7 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 
 					// if not near the intersection, accelerate to the recommended speed
 					if IsCarNearIntersection(currCar, currBlock, currCarHeading) {
+						log.Println("car is near the intersection, decelerating")
 						setCarSelfSpeed(ctx, STOP_SPEED)
 					} else {
 						setCarSelfSpeed(ctx, RECOMMENDED_FORWARD_SPEED)
@@ -348,8 +373,8 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 					// predStartTime, predEndTime
 					// make the lease at the first available time
 					firstAvailableTimeMilli := currBlock.GetLastEndTime() + 1 // FIXME: There are actually two available times, the other one is the current time till the start time of the first lease
-					reachTimeMilliUnderRecSpeed := int(getDistToBlockStart(currCar, currBlock, currCarHeading)/RECOMMENDED_FORWARD_SPEED*1000) - ALLOWED_ERROR_TIME_EXTENDING*2 + currTimeMilli
-					leaveTimeMilliUnderRecSpeed := int(getDistToBlockEnd(currCar, currBlock, currCarHeading)/RECOMMENDED_FORWARD_SPEED*1000) + ALLOWED_ERROR_TIME_EXTENDING*2 + currTimeMilli
+					reachTimeMilliUnderRecSpeed := int((getDistToBlockStart(currCar, currBlock, currCarHeading)-CAR_DIST_HEAD)/RECOMMENDED_FORWARD_SPEED*1000) - ALLOWED_ERROR_TIME_EXTENDING*2 + currTimeMilli
+					leaveTimeMilliUnderRecSpeed := int((getDistToBlockEnd(currCar, currBlock, currCarHeading)+CAR_DIST_TAIL)/RECOMMENDED_FORWARD_SPEED*1000) + ALLOWED_ERROR_TIME_EXTENDING*2 + currTimeMilli
 					if firstAvailableTimeMilli < currTimeMilli || firstAvailableTimeMilli < reachTimeMilliUnderRecSpeed {
 						// reserve the lease according to the recommended speed
 						newLease := lease.NewLease(carName, currBlock.GetName(), reachTimeMilliUnderRecSpeed, leaveTimeMilliUnderRecSpeed)

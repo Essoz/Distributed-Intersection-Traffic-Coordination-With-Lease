@@ -159,5 +159,7 @@ func RunPerceptionService(cli *clientv3.Client, ctx context.Context, carName str
 
 		// sleep for 0.05 second
 		time.Sleep(50 * time.Millisecond)
+
+		SurroundingCarsLeasing(cli, ctx, currSurrCars, currCar)
 	}
 }
