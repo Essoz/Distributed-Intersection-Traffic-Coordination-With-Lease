@@ -90,6 +90,10 @@ class KalmanFilter(object):
     def change_x(self, new_x):
         self.x = new_x
 
+# KF
+if kalman_on == 1:
+    kf_0 = KalmanFilter(H = np.array([1, 0, 0]).reshape(1, 3))
+    kf_1 = KalmanFilter(H = np.array([1, 0, 0]).reshape(1, 3))
 
 
 # Timing
@@ -169,12 +173,40 @@ myCar = QCar()
 if manual_drive:
     gpad = gamepadViaTarget(1)
 
+def solve_2nd_func(a, b, c):
+    drt = b*b-4*a*c
+    if a == 0:
+        if b != 0:
+            return -c/b
+        else:
+            return None
+    else:
+        if drt == 0:
+            return -b/2/a
+        elif drt > 0:
+            return (-b + np.sqrt(drt))/2/a
+        else:
+            return None
 
 
-# KF
-if kalman_on == 1:
-    kf_0 = KalmanFilter(H = np.array([1, 0, 0]).reshape(1, 3))
-    kf_1 = KalmanFilter(H = np.array([1, 0, 0]).reshape(1, 3))
+cam_dist_offset = [(0.055, -0.03), (0.15, 0), (0.07, 0.03), (0.2, 0)]
+cam_angle = [1.5*np.pi, np.pi, 0.5*np.pi, 0]
+def get_angle(lidar_angle, lidar_dist, cam_num):
+    dist_offset = (cam_dist_offset[cam_num][0]**2 + cam_dist_offset[cam_num][1]**2)**0.5
+    angle_offset = np.arctan2(cam_dist_offset[cam_num][1], cam_dist_offset[cam_num][0])
+
+    lidar_angle = lidar_angle - cam_angle[cam_num]
+    if lidar_angle > np.pi/2:
+        lidar_angle -= 2*np.pi
+    elif lidar_angle < -np.pi/2:
+        lidar_angle += 2*np.pi
+    dist_to_cam = solve_2nd_func(1, -2*dist_offset*np.cos(np.pi + angle_offset - lidar_angle), dist_offset**2-lidar_dist**2)
+    angle = np.arccos((lidar_dist**2 + dist_offset**2 - dist_to_cam**2) / (2 * lidar_dist * dist_offset))
+
+    if lidar_angle >= angle_offset:
+        return cam_angle[cam_num] + angle_offset + angle
+    else:
+        return cam_angle[cam_num] + angle_offset - angle
 
 img_w = 1300
 img_h = 980
@@ -248,27 +280,27 @@ def process_pred(pred, map):
                 if car_2[3] is not None and car_2[3] == car_1[2] and car_2[2] == car_1[3]:
                     if car_1[2] < car_2[2]:
                         if car_1[2] != 0 or car_2[2] != 3:
-                            new_cars_angle.append((car_1[0], car_2[1]))
+                            new_cars_angle.append((car_1[0], car_2[1], car_1[2], car_2[2]))
                             break
                         else:
-                            new_cars_angle.append((car_2[0]+2*np.pi, car_1[1]))
+                            new_cars_angle.append((car_2[0]+2*np.pi, car_1[1], car_2[2], car_1[2]))
                             break
                     elif car_1[2] > car_2[2]:
                         if car_1[2] != 3 or car_2[2] != 0:
-                            new_cars_angle.append((car_2[0], car_1[1]))
+                            new_cars_angle.append((car_2[0], car_1[1], car_2[2], car_1[2]))
                             break
                         else:
-                            new_cars_angle.append((car_1[0], car_2[1]-2*np.pi))
+                            new_cars_angle.append((car_1[0]+2*np.pi, car_2[1], car_1[2], car_2[2]))
                             break
         else:
-            new_cars_angle.append((car_1[0], car_1[1]))
+            new_cars_angle.append(car_1)
 
 
     # calculate location of each other car
     for car in new_cars_angle:
         dist_list = []
 
-        # angle: (-4.71, 1.57) (1.57, 7.85), car: (-1.57(maybe -3.14), 6.28(maybe 7.85))
+        # angle: (-4.71, 1.57) (1.57, 7.85), car: (-1.57, 7.85)
         for angle, dist in map:
             if (angle > 0.2*car[0] + 0.8*car[1] and angle < 0.8*car[0] + 0.2*car[1]) or\
                (angle+2*np.pi > 0.2*car[0] + 0.8*car[1] and angle+2*np.pi < 0.8*car[0] + 0.2*car[1]):
@@ -282,7 +314,16 @@ def process_pred(pred, map):
             dist_list = [i for i in dist_list if np.abs(i - median) < 0.2]
             if len(dist_list) != 0:
                 real_dist = sum(dist_list) / len(dist_list)
-                real_angle = (car[0] + car[1])/2
+
+                angle_left = get_angle(car[0], real_dist, car[2])
+                if car[3] is not None:
+                    angle_right = get_angle(car[1], real_dist, car[3])
+                else:
+                    angle_right = get_angle(car[1], real_dist, car[2])
+                if angle_left < angle_right:
+                    angle_left += 2*np.pi
+                real_angle = (angle_left + angle_right)/2
+
                 cars_position.append((np.cos(real_angle)*real_dist, np.sin(real_angle)*real_dist, np.tan(0.5*(car[0]-car[1]))*real_dist))
         else:
             print("cnm, empty dist_list")
