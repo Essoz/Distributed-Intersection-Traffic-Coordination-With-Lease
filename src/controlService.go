@@ -203,7 +203,8 @@ func getCarRecommendedSpeed(currCar car.Car, currBlock lease.Block, heading []fl
 	}
 
 	if currLease.EndTime < currTimeMilli {
-		log.Fatal("The lease should not be expired")
+		log.Printf("The lease should not be expired")
+		return RECOMMENDED_FORWARD_SPEED
 	}
 
 	// speed's lower bound is distMax / (leaseEndTime - currTime)
@@ -217,8 +218,9 @@ func getCarRecommendedSpeed(currCar car.Car, currBlock lease.Block, heading []fl
 	speedUpperBound := distMin / (leaseStartTimeSeconds - currTimeSeconds)
 
 	if speedUpperBound < 0 {
-		// keep the curr speed
-		return getCurrSpeedScalar(currCar, heading)
+		// keep the RECOMMENDED_FORWARD_SPEED
+		// return getCurrSpeedScalar(currCar, heading)
+		return RECOMMENDED_FORWARD_SPEED
 	}
 
 	if speedLowerBound > speedUpperBound {
@@ -233,15 +235,15 @@ func getCarRecommendedSpeed(currCar car.Car, currBlock lease.Block, heading []fl
 		// TODO: the car cannot make it to the intersection, what should we do?
 	}
 
-	if RECOMMENDED_FORWARD_SPEED >= speedLowerBound && RECOMMENDED_FORWARD_SPEED <= speedUpperBound {
-		return RECOMMENDED_FORWARD_SPEED
-	}
+	// if RECOMMENDED_FORWARD_SPEED >= speedLowerBound && RECOMMENDED_FORWARD_SPEED <= speedUpperBound {
+	// 	return RECOMMENDED_FORWARD_SPEED
+	// }
 
-	if RECOMMENDED_FORWARD_SPEED < (speedLowerBound+speedUpperBound)/2 {
-		return RECOMMENDED_FORWARD_SPEED
-	} else {
-		return (speedLowerBound + speedUpperBound) / 2
-	}
+	// if RECOMMENDED_FORWARD_SPEED < (speedLowerBound+speedUpperBound)/2 {
+	// 	return RECOMMENDED_FORWARD_SPEED
+	// } else {
+	return (speedLowerBound + speedUpperBound) / 2
+	// }
 }
 
 func getCurrSpeedScalar(currCar car.Car, heading []float64) float64 {
@@ -260,7 +262,7 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 
 	time.Sleep(2 * time.Second) // FIXME: remove this hack
 	currCar := car.GetCarEtcd(cli, ctx, carName)
-	currBlock := getCurrBlock(cli, ctx) // FIXME: we assume there is only one block
+	intersectionBlock := getCurrBlock(cli, ctx) // FIXME: we assume there is only one block
 	currCarHeading := getCarSelfHeading(ctx)
 
 	log.Printf("Current heading is %v\n", currCarHeading)
@@ -268,16 +270,9 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 	for {
 		currCar = car.GetCarEtcd(cli, ctx, carName)
 		for !currCar.IsCarAtDestination(ALLOWED_ERROR_LOCATION) {
-			stage := getCarStage(currCar, currBlock, currCarHeading)
-			currBlock = getCurrBlock(cli, ctx)
+			stage := getCarStage(currCar, intersectionBlock, currCarHeading)
 			currTimeMilli := getCurrTimeMilli()
 			log.Printf("CurrentStage: %s\n, time %d", stage, currTimeMilli)
-
-			currBlock.CleanPastLeases(currTimeMilli)
-			// print all the leases
-			for _, lease := range currBlock.Spec.Leases {
-				log.Printf("Lease %s: %#v\n", lease.CarName, lease)
-			}
 
 			if !currCar.IsDestinationAhead(currCarHeading) {
 				log.Println("destination is behind the car, not running lease control service")
@@ -312,6 +307,7 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 				setCarSelfSpeed(ctx, RECOMMENDED_FORWARD_SPEED)
 
 				// LEASING
+				currBlock := getCurrBlock(cli, ctx)
 				currBlock.CleanCarLeases(carName)
 				currBlock.PutEtcd(cli, ctx, "")
 
@@ -322,16 +318,22 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 
 				// LEASING
 				// get current time in milliseconds
+				currBlock := getCurrBlock(cli, ctx)
 				for _, lease := range currBlock.Spec.Leases {
 					log.Printf("[CROSSING] Lease %s: %#v\n", lease.CarName, lease)
 				}
 
 				recentPastLease := currBlock.GetCarLease(carName)
-				if currTimeMilli > recentPastLease.EndTime-3*ALLOWED_ERROR_TIME_EXTENDING {
+				if recentPastLease == nil {
+					continue // FIXME: this is a hack, a lease should never expire
+				}
+
+				if currTimeMilli > recentPastLease.EndTime-5*ALLOWED_ERROR_TIME_EXTENDING {
 					log.Printf("Lease is ending, trying to extend the lease")
 					// extend the lease of the car itself (end only)
 					currentEndTime := currBlock.GetCarLease(carName).EndTime
 					log.Printf("Previous lease end time is %d", currentEndTime)
+					currBlock := getCurrBlock(cli, ctx)
 					for idx := range currBlock.Spec.Leases {
 						if currBlock.Spec.Leases[idx].CarName == carName {
 							currBlock.Spec.Leases[idx].EndTime = currentEndTime + LEASE_EXTEND_DURATION*2
@@ -341,14 +343,15 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 					// extend the upcoming leases (start and end)
 					currBlock.DelayUpcomingLease(currBlock.GetCarLease(carName).EndTime)
 					log.Printf("New lease end time is %d", currBlock.GetCarLease(carName).EndTime)
+					currBlock.PutEtcd(cli, ctx, "")
 				}
-				currBlock.PutEtcd(cli, ctx, "")
 
 			} else if stage == "planning" {
+				currBlock := getCurrBlock(cli, ctx)
 				currLease := currBlock.GetCarLease(carName)
 
 				// CONTROL FIRST
-				if currLease == nil {
+				if currLease == nil || currLease.EndTime < currTimeMilli {
 					log.Println("no lease found, trying to lease")
 
 					// if not near the intersection, accelerate to the recommended speed
@@ -368,6 +371,7 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 
 				// LEASING
 				if currLease == nil {
+					currBlock := getCurrBlock(cli, ctx)
 					// if there's no lease, try to make leases
 					// given the current speed, predict the time when the car will reach the intersection
 					// predStartTime, predEndTime
@@ -402,12 +406,14 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 					if currLease.EndTime < currTimeMilli {
 						// if not, cancel the lease
 						log.Println("lease expired, cancelling lease")
+						currBlock := getCurrBlock(cli, ctx)
 						currBlock.CleanPastLeases(currTimeMilli)
 						currBlock.PutEtcd(cli, ctx, "")
 					} else {
 						// if yes, check if we need to bring the lease forward
 						if getCurrSpeedScalar(currCar, currCarHeading) > RECOMMENDED_FORWARD_SPEED {
 							// if yes, attempt to bring the lease forward
+							currBlock := getCurrBlock(cli, ctx)
 							prevLease := currBlock.GetRecentPastLease(currLease.StartTime)
 							if prevLease != (lease.Lease{}) {
 								if prevLease.EndTime < currLease.StartTime-ALLOWED_ERROR_TIME_EXTENDING {
@@ -436,6 +442,11 @@ func RunControlService(cli *clientv3.Client, ctx context.Context, carName string
 			currCar = car.GetCarEtcd(cli, ctx, carName)
 
 		}
+
+		currTimeMilli := getCurrTimeMilli()
+		currBlock := getCurrBlock(cli, ctx)
+		currBlock.CleanPastLeases(currTimeMilli)
+		currBlock.PutEtcd(cli, ctx, "")
 
 		setCarSelfSpeed(ctx, STOP_SPEED)
 

@@ -21,7 +21,11 @@ func (b *Block) CleanPastLeases(currentTimeMilli int) {
 	for i, lease := range b.GetLeases() {
 		if lease.EndTime < currentTimeMilli {
 			log.Printf("[CLEAN PAST LEASES] CurrentTime: %d, Deleting lease %#v because of expiration", currentTimeMilli, lease)
-			b.Spec.Leases = append(b.GetLeases()[:i], b.GetLeases()[i+1:]...)
+			if i+1 < len(b.Spec.Leases) {
+				b.Spec.Leases = append(b.GetLeases()[:i], b.GetLeases()[i+1:]...)
+			} else {
+				b.Spec.Leases = b.GetLeases()[:i]
+			}
 		}
 	}
 }
@@ -111,6 +115,7 @@ func (b *Block) ApplyNewLease(lease Lease) error {
 
 func (b *Block) ApplyNewLeaseNonV2V(lease Lease) error {
 	// if there are conflicting leases, we want to delay all the leases after the new lease
+	log.Println("Applying new lease for non-V2V", lease)
 	b.addNewLease(lease)
 	b.DelayUpcomingLease(lease.EndTime)
 	return nil
@@ -118,6 +123,7 @@ func (b *Block) ApplyNewLeaseNonV2V(lease Lease) error {
 
 func (b *Block) UpdateLeaseNonV2V(newLease Lease) error {
 	// find the lease
+	log.Println("Updating lease for non-V2V", newLease)
 	for i, lease := range b.Spec.Leases {
 		if lease.CarName == newLease.CarName {
 			log.Printf("Updating lease %#v", lease)
@@ -165,7 +171,11 @@ func (b *Block) CleanCarLeases(carName string) {
 	for i, lease := range b.Spec.Leases {
 		if lease.CarName == carName {
 			log.Printf("Deleting lease %#v for car %s", lease, carName)
-			b.Spec.Leases = append(b.GetLeases()[:i], b.GetLeases()[i+1:]...)
+			if i+1 < len(b.Spec.Leases) {
+				b.Spec.Leases = append(b.GetLeases()[:i], b.GetLeases()[i+1:]...)
+			} else {
+				b.Spec.Leases = b.GetLeases()[:i]
+			}
 		}
 	}
 }

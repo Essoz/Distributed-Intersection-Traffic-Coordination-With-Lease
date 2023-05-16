@@ -44,29 +44,32 @@ func speedToDirection(currSpeed []float64) []int {
 func isCarTowardIntersection(surrCar car.Car, currBlock lease.Block) bool {
 	direction := speedToDirection(surrCar.Dynamics.Speed)
 	if direction[0] == 0 && direction[1] == 0 {
+		log.Printf("[isCarTowardIntersection] car %s is not moving", surrCar.Metadata.Name)
 		return false
 	}
 
+	log.Printf("[isCarTowardIntersection] car %s is moving toward %v, loc %v", surrCar.Metadata.Name, direction, surrCar.Dynamics.Location)
 	if direction[0] == 0 {
 		if direction[1] == 1 {
-			return surrCar.Dynamics.Location[1] > currBlock.Spec.Location[1]
+			return surrCar.Dynamics.Location[1] < currBlock.Spec.Location[1]
 		} else {
-			return surrCar.Dynamics.Location[1] <= currBlock.Spec.Location[1]+currBlock.Spec.Size[1]
+			return surrCar.Dynamics.Location[1] >= currBlock.Spec.Location[1]+currBlock.Spec.Size[1]
 		}
 	} else {
 		if direction[0] == 1 {
-			return surrCar.Dynamics.Location[0] > currBlock.Spec.Location[0]
+			return surrCar.Dynamics.Location[0] < currBlock.Spec.Location[0]
 		} else {
-			return surrCar.Dynamics.Location[0] <= currBlock.Spec.Location[0]+currBlock.Spec.Size[0]
+			return surrCar.Dynamics.Location[0] >= currBlock.Spec.Location[0]+currBlock.Spec.Size[0]
 		}
 	}
 }
 
 func isCarInsideBlock(surrCar car.Car, currBlock lease.Block) bool {
+	log.Printf("[isCarInsideBlock] car %s location: %v, block %s location: %v, size: %v", surrCar.Metadata.Name, surrCar.Dynamics.Location, currBlock.Metadata.Name, currBlock.Spec.Location, currBlock.Spec.Size)
 	return surrCar.Dynamics.Location[0] >= currBlock.Spec.Location[0] &&
-		surrCar.Dynamics.Location[0] <= currBlock.Spec.Location[0]+currBlock.Spec.Size[0] &&
+		surrCar.Dynamics.Location[0] <= (currBlock.Spec.Location[0]+currBlock.Spec.Size[0]) &&
 		surrCar.Dynamics.Location[1] >= currBlock.Spec.Location[1] &&
-		surrCar.Dynamics.Location[1] <= currBlock.Spec.Location[1]+currBlock.Spec.Size[1]
+		surrCar.Dynamics.Location[1] <= (currBlock.Spec.Location[1]+currBlock.Spec.Size[1])
 }
 
 func nonV2VTimeToEnterBlock(surrCar car.Car, currBlock lease.Block) (int, error) {
@@ -86,7 +89,7 @@ func nonV2VTimeToEnterBlock(surrCar car.Car, currBlock lease.Block) (int, error)
 
 func nonV2VTimeToLeaveBlock(surrCar car.Car, currBlock lease.Block) (int, error) {
 	// IF CAR IS OUTSIDE THE BLOCK, THEN RETURN 0
-	if !isCarInsideBlock(surrCar, currBlock) {
+	if isCarInsideBlock(surrCar, currBlock) {
 		return 0, errors.New("car is already inside the block")
 	}
 
@@ -125,15 +128,15 @@ func SurroundingCarsLeasing(cli *clientv3.Client, ctx context.Context, surroundi
 				than 0 and the car's location is near a range of the intersection.
 			2. The car is not going to cross the intersection if the car's speed is 0.
 	*/
-	surrCarNames := []string{}
 
 	for _, surrCar := range surroundingCars {
 		currBlock := getCurrBlock(cli, ctx)
 		currTimeMilli := getCurrTimeMilli()
 		surrCarName := "car/" + currCar.Metadata.Name + "/surrounding/" + surrCar.Metadata.Name
-		surrCarNames = append(surrCarNames, surrCarName)
+		log.Printf("[NONV2VLeasing] surrCarName: %v", surrCarName)
 		if !isCarTowardIntersection(surrCar, currBlock) {
 			// the car is not going to cross the intersection, delete all related leases
+			log.Printf("[NONV2VLeasing] car %v is not going to cross the intersection", surrCarName)
 			currBlock.CleanCarLeases(surrCarName)
 			currBlock.PutEtcd(cli, ctx, "")
 			continue
@@ -145,6 +148,7 @@ func SurroundingCarsLeasing(cli *clientv3.Client, ctx context.Context, surroundi
 		timeToEnterBlock, err := nonV2VTimeToEnterBlock(surrCar, currBlock)
 		if err != nil {
 			// cannot determine the time to enter the block, continue
+			log.Printf("[NONV2VLeasing] cannot determine the time for car %s to enter the block due to error %s, continue", surrCarName, err.Error())
 			continue
 		}
 		leaseStart := currTimeMilli + timeToEnterBlock - ALLOWED_ERROR_TIME_EXTENDING*5
@@ -152,6 +156,7 @@ func SurroundingCarsLeasing(cli *clientv3.Client, ctx context.Context, surroundi
 		timeToLeaveBlock, err := nonV2VTimeToLeaveBlock(surrCar, currBlock)
 		if err != nil {
 			// cannot determine the time to leave the block, continue
+			log.Printf("[NONV2VLeasing] cannot determine the time for car %s to leave the block due to error %s, continue", surrCarName, err.Error())
 			continue
 		}
 		leaseEnd := currTimeMilli + timeToLeaveBlock + ALLOWED_ERROR_TIME_EXTENDING*5
@@ -162,14 +167,9 @@ func SurroundingCarsLeasing(cli *clientv3.Client, ctx context.Context, surroundi
 			// there is already a lease for the car, update the lease
 			currLease.StartTime = leaseStart
 			currLease.EndTime = leaseEnd
-			currBlock.ApplyNewLeaseNonV2V(*currLease)
+			currBlock.UpdateLeaseNonV2V(*currLease)
 		}
 
 		currBlock.PutEtcd(cli, ctx, "")
 	}
-
-	// delete all leases that are not in the surrounding cars
-	currBlock := getCurrBlock(cli, ctx)
-	currBlock.CleanNonExistSurrCarLeases(surrCarNames)
-	currBlock.PutEtcd(cli, ctx, "")
 }

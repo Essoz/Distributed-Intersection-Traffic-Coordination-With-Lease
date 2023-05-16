@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 
 const (
 	PERCEPTION_SERVICE_PORT = "11001"
+	LOCATION_ERROR          = 0.3
 )
 
 func getCarSelfSpeed(ctx context.Context) []float64 {
@@ -87,6 +89,8 @@ func getCarSurrounding(ctx context.Context) []car.Car {
 
 	var result map[string]interface{}
 	err = json.Unmarshal(body, &result)
+	// printout body as json string
+	// log.Printf("Body: %s", string(body))
 	if err != nil {
 		log.Fatalf("Failed to parse JSON: %v", err)
 	}
@@ -125,6 +129,19 @@ func getCarSurrounding(ctx context.Context) []car.Car {
 	return cars
 }
 
+func IsSameCar(car1 car.Car, car2 car.Car, allowedError float64) bool {
+	if len(car1.GetLocation()) != 2 || len(car2.GetLocation()) != 2 {
+		return false
+	}
+	loc_x_diff := math.Abs(car1.GetLocation()[0] - car2.GetLocation()[0])
+	loc_y_diff := math.Abs(car1.GetLocation()[1] - car2.GetLocation()[1])
+
+	if loc_x_diff <= allowedError && loc_y_diff <= allowedError {
+		return true
+	}
+	return false
+}
+
 func RunPerceptionService(cli *clientv3.Client, ctx context.Context, carName string) {
 	// THIS FUNCTION WILL INTERFACE THE PERCEPTION SERVICE
 	log.Printf("Running perception service for car %s", carName)
@@ -150,16 +167,45 @@ func RunPerceptionService(cli *clientv3.Client, ctx context.Context, carName str
 
 		// Get all surrounding objects
 		currSurrCars := getCarSurrounding(ctx)
+		allCars := car.GetAllCarsEtcd(cli, ctx, "")
+		toRemove := make([]int, 0)
+		for idx, surrCar := range currSurrCars {
+			for _, existingCar := range allCars {
+				if IsSameCar(surrCar, *existingCar, LOCATION_ERROR) {
+					// remove the surrCar
+					if surrCar.GetName() == existingCar.GetName() {
+						continue
+					}
+
+					log.Printf("Removing Car %s because it is duplicated with %s", surrCar.GetName(), existingCar.GetName())
+					toRemove = append(toRemove, idx)
+				}
+			}
+		}
+
+		// remove the surrCar
+		for i := len(toRemove) - 1; i >= 0; i-- {
+			if len(currSurrCars) == 1 {
+				currSurrCars = make([]car.Car, 0)
+				break
+			}
+			if toRemove[i] == len(currSurrCars)-1 {
+				currSurrCars = currSurrCars[:toRemove[i]]
+				break
+			}
+			currSurrCars = append(currSurrCars[:toRemove[i]], currSurrCars[toRemove[i]+1:]...)
+		}
+
 		currSurrCarPtrs := make([]*car.Car, len(currSurrCars))
 		for i := range currSurrCars {
 			// log.Printf("Surrounding car %s", currSurrCars[i].Metadata.Name)
 			currSurrCarPtrs[i] = &currSurrCars[i]
 		}
+		SurroundingCarsLeasing(cli, ctx, currSurrCars, currCar)
 		currCar.UpdateSurroundingCarsEtcd(cli, ctx, currSurrCarPtrs)
 
 		// sleep for 0.05 second
 		time.Sleep(50 * time.Millisecond)
 
-		SurroundingCarsLeasing(cli, ctx, currSurrCars, currCar)
 	}
 }

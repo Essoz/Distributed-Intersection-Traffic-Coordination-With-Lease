@@ -13,14 +13,6 @@ func (b *Block) GetLeases() []Lease {
 	return b.Spec.Leases
 }
 
-func (b *Block) CleanPastLeases(currentTime int) {
-	for i, lease := range b.GetLeases() {
-		if lease.EndTime < currentTime {
-			b.Spec.Leases = append(b.GetLeases()[:i], b.GetLeases()[i+1:]...)
-		}
-	}
-}
-
 func (b *Block) GetCurrentLease(currentTime int) Lease {
 	for _, lease := range b.GetLeases() {
 		if lease.StartTime <= currentTime && lease.EndTime >= currentTime {

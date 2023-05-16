@@ -398,10 +398,8 @@ def match_cars(cars_position, speed, dist, timeDetect):
             if (possible_pos[0] - x_location_abs)**2 + (possible_pos[1] - y_location_abs)**2 < 0.2**2 and not appended:
                 x_speed = 0.7 * (x_location_abs - cars_dict[car_2]["location"][0]) / (timeDetect - cars_dict[car_2]["time"]) + 0.3 * cars_dict[car_2]["speed"][0]
                 y_speed = 0.7 * (y_location_abs - cars_dict[car_2]["location"][1]) / (timeDetect - cars_dict[car_2]["time"]) + 0.3 * cars_dict[car_2]["speed"][1]
-                x_speed_abs = x_speed * np.cos(heading) - y_speed * np.sin(heading) + speed * np.cos(heading)
-                y_speed_abs = x_speed * np.sin(heading) + y_speed * np.cos(heading) + speed * np.sin(heading)
 
-                cars_dict[car_2]["speed"] = (x_speed_abs, y_speed_abs)
+                cars_dict[car_2]["speed"] = (x_speed, y_speed)
                 cars_dict[car_2]["location"] = (x_location_abs, y_location_abs)
                 cars_dict[car_2]["time"] = timeDetect
                 appended = True
