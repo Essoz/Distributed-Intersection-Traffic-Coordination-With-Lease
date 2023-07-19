@@ -3,6 +3,7 @@
 ## Introduction
 
 ## Installation
+The torch wheel to be used on Qcar is torch-1.10.0-cp36-cp36m-linux_aarch64.whl
 
 ### Prerequisites
 
