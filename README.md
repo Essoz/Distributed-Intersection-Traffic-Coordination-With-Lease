@@ -1,11 +1,24 @@
 # Lease Management System for the Intersection Obstacle Avoidance Project at Zhejiang University -- University of Illinois Urbana-Champaign
 
 ## Introduction
+
+**Hardware and Software Stacks**
+Our team uses the Quanser Car (Qcar) as the experimental car to finish the design. The Qcar (Figure 1) is equipped with a LIDAR, an RGBD camera, and four CSI cameras on the front, left, rear, and right sides. Qcar has an on-board GPU to support necessary computation for machine-learning-based multi-objective tracking.
+
+<div style="text-align: center;">
+    <img src="./image/physical.png" alt="Qcar Diagram" style="width: 60%;">
+    <p>Figure 1: Qcar Diagram</p>
+</div>
+
+The software stack contains three main blocks (colored in orange, blue, and green). The red arrows between them indicate inter-block data transfers. The orange block refers to Python files that read and process the raw data from the hardware (like Lidar, cameras, and motors). We use Python here because the Qcar itself provides some basic hardware drivers in Python. The green block refers an environment pool implemented in *etcd*, a distributed and reliable database, where we store all observed objects. The blue block refers to the main function of VVCCS. We realize it in Go, since it can both call the Python API and easily interact with etcd. After launching, all three main blocks will be initialized and will run concurrently. 
+
+The main function in Go principally contains a loop with three code blocks: Perception, Decision-Making, and Control. The perception block polls the Python interface to get data. The system will then obtain the state of observed surrounding objects from the Lidar and cameras (after a multimodal information fusion module) and obtain the state of itself from the motor. Thereafter, the perception block will create new objects, delete outdated objects, and update the state of objects that are under tracking in the etcd. The decision-making block runs the whole collision avoidance algorithm with stored data in etcd, and outputs the desired speed to the control block to enforce it. After finishing all three blocks, our system will wait for a certain time before entering the next loop so that it can stay synchronized with the sampling and information fusion module in Python. 
+
 **Algorithm Specification.**  
 Our algorithm incorporates two subsystems: the lease-based scheduling subsystem and the planning subsystem. The scheduling algorithm employs a series of discrete snapshots capturing the intersection state at given timestamps. Each snapshot records the speed, location, type, and a unique identifier for every traffic participant. From this data, a lease, delineating the temporal duration of a vehicle's intersection occupancy, is created for each vehicle. A lease can be extended, canceled, or reapplied in response to unpredictable circumstances. The planning subsystem evaluates the lease assigned to each vehicle, modulating the vehicle's speed to adhere to the lease terms. In essence, the algorithm processes intersection snapshots as input to produce corresponding vehicle movements as output.
 
 **Lease-based Scheduling Subsystem.**  
-This subsection provides a comprehensive understanding of the elegance, simplicity, and adaptability of our solution. The ingenuity of our design stems from its ability to strike a balance between efficiency, safety, and timeliness depending on specific application scenarios and computational resources. Our design hinges on the proven and effective FIFO (First In First Out) algorithm \cite{coop-driving} used for obstacle avoidance.
+This subsection provides a comprehensive understanding of the elegance, simplicity, and adaptability of our solution. The ingenuity of our design stems from its ability to strike a balance between efficiency, safety, and timeliness depending on specific application scenarios and computational resources. Our design hinges on the proven and effective FIFO (First In First Out) algorithm used for obstacle avoidance.
 
 <div style="text-align: center;">
     <div style="display: inline-block; margin-right: 10px;">
@@ -14,11 +27,11 @@ This subsection provides a comprehensive understanding of the elegance, simplici
     <div style="display: inline-block;">
         <img src="./image/FIFOLowEfficiency.png" alt="Low-efficiency of the Lock Implementation" style="width: 90%;">
     </div>
-    <p>Figure 1: FIFO Algorithm and Low-efficiency of the Lock Implementation</p>
+    <p>Figure 2: FIFO Algorithm and Low-efficiency of the Lock Implementation</p>
 </div>
 
 **The Lock-based Algorithm.**  
-Previous algorithms metaphorically treat the intersection as a computer science lock. Vehicles attempt to acquire the lock before entering the intersection, delaying their entry if the lock is occupied (Figure 1). This one-at-a-time entry policy assures absolute safety. However, this straightforward approach presents a major drawback: the absence of scheduling capabilities, resulting in safety and efficiency issues. For instance:
+Previous algorithms metaphorically treat the intersection as a computer science lock. Vehicles attempt to acquire the lock before entering the intersection, delaying their entry if the lock is occupied (Figure 2). This one-at-a-time entry policy assures absolute safety. However, this straightforward approach presents a major drawback: the absence of scheduling capabilities, resulting in safety and efficiency issues. For instance:
 
 - **Abrupt halts:** Vehicles cannot anticipate when a lock might be obtained by others, leading to sudden stops or reduced efficiency.
 - **Efficiency conundrums:** Without advance knowledge of lock release, vehicles can't adjust their speed to seamlessly traverse the intersection immediately upon lock availability. This issue exacerbates traffic congestion under heavy traffic conditions.
@@ -73,7 +86,7 @@ In this project, we have shown that the "lease" concept can have great potential
 
 <div style="text-align: center;">
     <img src="./image/FIFOExtremeImprovement.png" alt="Design of an Improved Lease Algorithm" style="width: 60%;">
-    <p>Figure 2: Design of an Improved Lease Algorithm</p>
+    <p>Figure 3: Design of an Improved Lease Algorithm</p>
 </div>
 
 
